@@ -139,25 +139,33 @@ struct Segmented<T: Hashable>: View {
     }
 }
 
-/// Большая синяя кнопка внизу экрана.
-struct PrimaryButton: View {
-    @Environment(\.palette) private var palette
+/// Кнопка действия — системные стили, а не своя заливка со скруглением.
+/// На iOS 26 они сами получают нужную форму и «стекло».
+struct ActionButton: View {
+    enum Kind { case primary, secondary, destructive }
+
     let title: String
-    var background: Color? = nil
-    var foreground: Color? = nil
+    var kind: Kind = .primary
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(foreground ?? .white)
+        switch kind {
+        case .primary:
+            Button(title, action: action)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
                 .frame(maxWidth: .infinity)
-                .frame(height: 50)
-                .background(background ?? palette.blue,
-                            in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        case .secondary:
+            Button(title, action: action)
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .frame(maxWidth: .infinity)
+        case .destructive:
+            Button(title, role: .destructive, action: action)
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .frame(maxWidth: .infinity)
         }
-        .buttonStyle(.plain)
     }
 }
 
@@ -240,5 +248,30 @@ struct LargeTitle: View {
         Text(text)
             .font(.system(size: 34, weight: .bold))
             .foregroundStyle(palette.fg)
+    }
+}
+
+/// Высота содержимого шторки. Детент `.height(экран − отступ)` оставлял под
+/// коротким содержимым пустое поле (жалоба владельца 12.08.2026); теперь
+/// шторка ровно по контенту.
+struct SheetContentHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+extension View {
+    /// Померить собственную высоту и отдать её наружу — для `.presentationDetents`.
+    func measuringSheetHeight(_ height: Binding<CGFloat>) -> some View {
+        background(
+            GeometryReader { g in
+                Color.clear.preference(key: SheetContentHeightKey.self, value: g.size.height)
+            }
+        )
+        .onPreferenceChange(SheetContentHeightKey.self) { h in
+            // Ноль приходит на разборке вью — им детент портить нельзя.
+            if h > 1 { height.wrappedValue = h }
+        }
     }
 }

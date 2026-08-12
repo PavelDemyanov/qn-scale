@@ -53,18 +53,17 @@ struct DaySheet: View {
             .cardInset()
             .padding(.top, 18)
 
-            Spacer()
-
-            PrimaryButton(title: "Удалить измерение",
-                          background: palette.card2,
-                          foreground: palette.red) {
+            ActionButton(title: "Удалить измерение", kind: .destructive) {
                 onDelete()
                 dismiss()
             }
             .padding(.horizontal, 16)
+            .padding(.top, 22)
             .padding(.bottom, 34)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        // БЕЗ maxHeight: .infinity — шторка ровно по содержимому
+        // (`measuringSheetHeight` на стороне вызова).
+        .frame(maxWidth: .infinity, alignment: .top)
         .background(palette.sheet)
         // Отступ 34 у кнопки — от края экрана, как в макете
         .ignoresSafeArea(edges: .bottom)

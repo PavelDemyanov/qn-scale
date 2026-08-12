@@ -43,50 +43,46 @@ struct HistoryView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            LargeTitle(text: "История")
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 20)
-                .padding(.bottom, 12)
-
+        Group {
             if items.isEmpty {
                 emptyState
             } else {
-                Segmented(items: [(7.0, "7 дней"), (30.0, "30 дней"), (90.0, "90 дней"), (allDays, "Всё")],
-                          selection: Binding(get: { windowDays },
-                                             set: { value in
-                                                 withAnimation(.smooth(duration: 0.45)) {
-                                                     windowDays = value
-                                                     endDate = nil
-                                                 }
-                                             }))
-                    .cardInset()
-                    .padding(.bottom, 14)
+                List {
+                    Section {
+                        periodPicker
+                        chartCard
+                    }
+                    .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
 
-                chartCard
-                summarySection
-                measurementsSection
+                    summarySection
+                    measurementsSection
+                }
             }
         }
-        .padding(.top, 58)
-        .padding(.bottom, 24)
+    }
+
+    /// Выбор периода — системный сегментированный переключатель.
+    private var periodPicker: some View {
+        Picker("Период", selection: Binding(get: { windowDays },
+                                            set: { value in
+                                                // БЕЗ анимации: плавная смена
+                                                // периода снята 12.08.2026.
+                                                windowDays = value
+                                                endDate = nil
+                                            })) {
+            Text("7 дней").tag(7.0)
+            Text("30 дней").tag(30.0)
+            Text("90 дней").tag(90.0)
+            Text("Всё").tag(allDays)
+        }
+        .pickerStyle(.segmented)
+        .padding(.bottom, 6)
     }
 
     private var emptyState: some View {
-        VStack(spacing: 10) {
-            Spacer(minLength: 100)
-            Image(systemName: "chart.xyaxis.line")
-                .font(.system(size: 40, weight: .light))
-                .foregroundStyle(palette.fg3)
-            Text("Пока пусто")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(palette.fg)
-            Text("Встаньте на весы — первое измерение появится здесь.")
-                .font(.system(size: 15))
-                .multilineTextAlignment(.center)
-                .foregroundStyle(palette.fg2)
-                .padding(.horizontal, 40)
-        }
+        ContentUnavailableView("Пока пусто",
+                               systemImage: "chart.xyaxis.line",
+                               description: Text("Встаньте на весы — первое измерение появится здесь."))
     }
 
     // MARK: - График
@@ -124,11 +120,6 @@ struct HistoryView: View {
             }
             .frame(height: chartHeight)
         }
-        .padding(.horizontal, 12)
-        .padding(.top, 14)
-        .padding(.bottom, 8)
-        .card()
-        .cardInset()
     }
 
     private var spanLabel: String {
@@ -177,8 +168,6 @@ struct HistoryView: View {
                     .offset(x: min(max(0, markPoint.x - 50), max(0, width - axisWidth - 116)), y: 2)
             }
         }
-        .animation(.smooth(duration: 0.45), value: windowDays)
-        .animation(.smooth(duration: 0.25), value: markedDate)
         .contentShape(Rectangle())
         .gesture(dragGesture(width: width, geo: geo))
         .simultaneousGesture(zoomGesture)
@@ -197,7 +186,6 @@ struct HistoryView: View {
                 .frame(width: markerHeld ? 14 : 10, height: markerHeld ? 14 : 10)
                 .position(point)
         }
-        .animation(.snappy(duration: 0.15), value: markerHeld)
     }
 
     private func axisLabels(geo: ChartGeometry, width: CGFloat) -> some View {
@@ -332,87 +320,54 @@ struct HistoryView: View {
     // MARK: - Итоги и список
 
     private var summarySection: some View {
-        VStack(spacing: 0) {
-            SectionHeader(text: "ИТОГ ЗА ПЕРИОД", top: 18)
-            VStack(spacing: 0) {
-                let ws = visible.map(\.weightKg)
-                let change = (visible.count > 1) ? (visible.last!.weightKg - visible.first!.weightKg) : 0
-                summaryRow("Изменение", "\(Fmt.signed(change)) кг", palette.delta(change))
-                RowSeparator()
-                summaryRow("Минимум", ws.min().map { "\(Fmt.n($0)) кг" } ?? "—", palette.fg2)
-                RowSeparator()
-                summaryRow("Максимум", ws.max().map { "\(Fmt.n($0)) кг" } ?? "—", palette.fg2)
-                RowSeparator()
-                summaryRow("Взвешиваний", "\(visible.count)", palette.fg2)
+        let ws = visible.map(\.weightKg)
+        let change = (visible.count > 1) ? (visible.last!.weightKg - visible.first!.weightKg) : 0
+        return Section("Итог за период") {
+            LabeledContent("Изменение") {
+                Text("\(Fmt.signed(change)) кг")
+                    .foregroundStyle(palette.delta(change))
             }
-            .card()
-            .cardInset()
-        }
-    }
-
-    private func summaryRow(_ label: String, _ value: String, _ color: Color) -> some View {
-        Row(title: label, minHeight: 44) {
-            Text(value)
-                .font(.system(size: 16, weight: .medium))
-                .monospacedDigit()
-                .foregroundStyle(color)
+            LabeledContent("Минимум", value: ws.min().map { "\(Fmt.n($0)) кг" } ?? "—")
+            LabeledContent("Максимум", value: ws.max().map { "\(Fmt.n($0)) кг" } ?? "—")
+            LabeledContent("Взвешиваний", value: "\(visible.count)")
         }
     }
 
     private var measurementsSection: some View {
-        VStack(spacing: 0) {
-            SectionHeader(text: "ИЗМЕРЕНИЯ", top: 18)
-            VStack(spacing: 0) {
-                let rows = Array(visible.reversed().prefix(18))
-                ForEach(rows) { item in
-                    Button { onOpenDay(item) } label: {
-                        measurementRow(item)
-                    }
+        let rows = Array(visible.reversed().prefix(18))
+        return Section {
+            ForEach(rows) { item in
+                Button { onOpenDay(item) } label: { measurementRow(item) }
                     .buttonStyle(.plain)
-                    if item.id != rows.last?.id { RowSeparator() }
-                }
             }
-            .card()
-            .cardInset()
-
+        } header: {
+            Text("Измерения")
+        } footer: {
             Text(visible.count > 18
                  ? "Показаны последние 18 из \(visible.count) за период"
                  : "\(visible.count) измерений за период")
-                .font(.system(size: 12))
-                .foregroundStyle(palette.fg3)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 36)
-                .padding(.top, 8)
         }
     }
 
     private func measurementRow(_ item: WeighIn) -> some View {
         let d = delta(for: item)
         let fat = item.fatPercent(for: settings.profile)
-        return HStack(spacing: 0) {
+        return HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 1) {
                 Text(Fmt.dayLabel(item.date))
-                    .font(.system(size: 16))
-                    .foregroundStyle(palette.fg)
                 Text(fat.map { "\(Fmt.time(item.date)) · жир \(Fmt.n($0, 1)) %" } ?? Fmt.time(item.date))
-                    .font(.system(size: 12))
-                    .foregroundStyle(palette.fg3)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-            Spacer(minLength: 8)
+            Spacer(minLength: 4)
             Text(Fmt.n(item.weightKg))
-                .font(.system(size: 17, weight: .medium))
                 .monospacedDigit()
-                .foregroundStyle(palette.fg)
-                .padding(.trailing, 14)
             Text(d.map { Fmt.signed($0) } ?? "—")
-                .font(.system(size: 15, weight: .semibold))
+                .font(.subheadline.weight(.semibold))
                 .monospacedDigit()
-                .foregroundStyle(d.map { palette.delta($0) } ?? palette.fg3)
+                .foregroundStyle(d.map { palette.delta($0) } ?? Color.secondary)
                 .frame(minWidth: 58, alignment: .trailing)
-            Chevron().padding(.leading, 10)
         }
-        .padding(.horizontal, 18)
-        .frame(minHeight: 52)
         .contentShape(Rectangle())
     }
 

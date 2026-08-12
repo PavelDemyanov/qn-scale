@@ -21,9 +21,8 @@ struct HealthImportSheet: View {
     private enum Stage { case preparing, options, running, done }
 
     var body: some View {
+        NavigationStack {
         VStack(spacing: 0) {
-            header
-
             VStack(spacing: 8) {
                 Text(title)
                     .font(.system(size: 22, weight: .semibold))
@@ -48,9 +47,7 @@ struct HealthImportSheet: View {
 
             Spacer()
 
-            PrimaryButton(title: buttonTitle,
-                          background: buttonEnabled ? palette.blue : palette.card2,
-                          foreground: buttonEnabled ? .white : palette.fg3) {
+            ActionButton(title: buttonTitle) {
                 if stage == .options { runImport() } else if stage == .done { dismiss() }
             }
             .disabled(!buttonEnabled)
@@ -61,26 +58,13 @@ struct HealthImportSheet: View {
         .background(palette.sheet)
         // Отступ 34 у кнопки — от края экрана, как в макете
         .ignoresSafeArea(edges: .bottom)
-        .task { await loadPreview() }
-    }
-
-    private var header: some View {
-        HStack {
-            Button("Отмена") { dismiss() }
-                .font(.system(size: 17))
-                .foregroundStyle(palette.blue)
-                .frame(width: 80, alignment: .leading)
-            Spacer()
-            Text("«Здоровье»")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(palette.fg)
-            Spacer()
-            // Не Color: он растягивается по вертикали и раздувает шапку на всю шторку.
-            Spacer().frame(width: 80)
+        .navigationTitle("«Здоровье»")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) { Button("Отмена") { dismiss() } }
         }
-        .padding(.horizontal, 18)
-        .padding(.top, 14)
-        .padding(.bottom, 10)
+        }
+        .task { await loadPreview() }
     }
 
     private var title: String {
@@ -123,37 +107,19 @@ struct HealthImportSheet: View {
     private var buttonEnabled: Bool { stage == .options || stage == .done }
 
     private var optionsCard: some View {
-        VStack(spacing: 0) {
-            Row(title: "Пропускать дубликаты", minHeight: 52) {
-                Toggle("", isOn: $skipDuplicates)
-                    .labelsHidden()
-                    .tint(palette.green)
-            }
-            RowSeparator()
-            Row(title: "Период", minHeight: 48) {
-                Text("вся история")
-                    .font(.system(size: 16))
-                    .foregroundStyle(palette.fg2)
-            }
+        List {
+            Toggle("Пропускать дубликаты", isOn: $skipDuplicates)
+            LabeledContent("Период", value: "вся история")
         }
-        .sheetCard(radius: 20)
-        .cardInset()
+        .scrollDisabled(true)
+        .frame(height: 140)
     }
 
     private var progressBar: some View {
-        VStack(spacing: 10) {
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(palette.seg)
-                    Capsule().fill(palette.blue)
-                        .frame(width: proxy.size.width * progress)
-                }
-            }
-            .frame(height: 6)
-            Text("\(Int(progress * 100)) %")
-                .font(.system(size: 13))
-                .monospacedDigit()
-                .foregroundStyle(palette.fg2)
+        ProgressView(value: progress) {
+            Text("Импортирую")
+        } currentValueLabel: {
+            Text(progress.formatted(.percent.precision(.fractionLength(0))))
         }
         .padding(.horizontal, 20)
     }

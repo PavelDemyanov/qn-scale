@@ -132,7 +132,7 @@ struct Stats {
         let cal = Calendar.current
         return (0..<7).reversed().map { back -> DayBar in
             let date = cal.date(byAdding: .day, value: -back, to: cal.startOfDay(for: Date())) ?? Date()
-            let weekday = Fmt.weekdaysShort[(cal.component(.weekday, from: date)) - 1]
+            let weekday = date.formatted(.dateTime.weekday(.abbreviated))
             guard let idx = items.firstIndex(where: { cal.isDate($0.date, inSameDayAs: date) }) else {
                 return DayBar(id: back, weekday: weekday, delta: nil)
             }

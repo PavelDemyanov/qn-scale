@@ -21,6 +21,18 @@ struct LibraApp: App {
     }
 }
 
+/// Подзаголовок навигации появился в iOS 26; на 17–18 просто ничего не добавляем.
+struct NavigationSubtitle: ViewModifier {
+    let text: String
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *), !text.isEmpty {
+            content.navigationSubtitle(text)
+        } else {
+            content
+        }
+    }
+}
+
 enum Tab: String, CaseIterable {
     case weigh, history, settings
 
@@ -66,6 +78,11 @@ struct RootView: View {
     /// Полная высота экрана — от неё считаются высоты шторок, как в макете
     /// (шторка поиска начинается в 120 пунктах от верха, импорт — в 150, день — в 300).
     @State private var screenHeight: CGFloat = 874
+
+    /// Высота шторки дня — по её содержимому (меряется при показе). Стартовое
+    /// значение близко к настоящему, чтобы первое открытие не подпрыгивало;
+    /// дальше оно уточняется само и живёт до конца сеанса.
+    @State private var daySheetHeight: CGFloat = 420
 
     private func sheetHeight(topInset: CGFloat) -> CGFloat {
         max(320, screenHeight - topInset)
@@ -142,53 +159,57 @@ struct RootView: View {
         }
         .sheet(item: $selectedDay) { item in
             DaySheet(item: item, delta: delta(for: item)) { delete(item) }
-                .presentationDetents([.height(sheetHeight(topInset: 300))])
+                .measuringSheetHeight($daySheetHeight)
+                .presentationDetents([.height(daySheetHeight)])
                 .presentationCornerRadius(22)
         }
     }
 
     // MARK: - Вкладки
 
-    /// Общая обёртка: фон во весь экран и прокрутка, начинающаяся от физического
-    /// верха (в макете все экраны отсчитывают свои 58 пунктов оттуда, а статус-бар
-    /// лежит поверх содержимого). Низ безопасной зоны не трогаем — там панель вкладок.
-    private func screen<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
-        ZStack(alignment: .top) {
-            palette.bg.ignoresSafeArea()
+    private var weighTab: some View {
+        NavigationStack {
             ScrollView {
-                VStack(spacing: 0) {
-                    content()
-                    Spacer(minLength: 0)
+                MainView(items: items,
+                         onManualAdd: { showManualEntry = true },
+                         onGoal: { tab = .settings },
+                         onOpenHistory: { tab = .history },
+                         onOpenDay: { selectedDay = $0 })
+            }
+            .background(palette.bg)
+            .navigationTitle("Вес")
+            // Дата последнего взвешивания — системным подзаголовком под крупным
+            // заголовком (iOS 26), а не своей строкой рядом с ним.
+            .modifier(NavigationSubtitle(text: lastWeighInLabel))
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Добавить вес вручную", systemImage: "plus") {
+                        showManualEntry = true
+                    }
                 }
             }
-            .scrollIndicators(.hidden)
-            .ignoresSafeArea(edges: .top)
-        }
-    }
-
-    private var weighTab: some View {
-        screen {
-            MainView(items: items,
-                     onManualAdd: { showManualEntry = true },
-                     onGoal: { tab = .settings },
-                     onOpenHistory: { tab = .history },
-                     onOpenDay: { selectedDay = $0 })
         }
     }
 
     private var historyTab: some View {
-        screen {
+        NavigationStack {
             HistoryView(items: items, onOpenDay: { selectedDay = $0 })
+                .navigationTitle("История")
         }
     }
 
     private var settingsTab: some View {
-        screen {
+        NavigationStack {
             SettingsView(items: items,
                          onSearchScale: { sheet = .connect },
                          onImportHealth: { sheet = .healthImport },
                          onRestartOnboarding: { showOnboarding = true })
         }
+    }
+
+    private var lastWeighInLabel: String {
+        guard let last = items.last else { return "" }
+        return Fmt.dayLabel(last.date) + ", " + Fmt.time(last.date)
     }
 
     // MARK: - Данные

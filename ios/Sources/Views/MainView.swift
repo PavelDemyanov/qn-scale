@@ -33,51 +33,17 @@ struct MainView: View {
 // MARK: - Пустая история
 
 private struct EmptyState: View {
-    @Environment(\.palette) private var palette
     let onManualAdd: () -> Void
 
     var body: some View {
-        VStack(spacing: 14) {
-            Spacer(minLength: 120)
-            Image(systemName: "scalemass")
-                .font(.system(size: 44, weight: .light))
-                .foregroundStyle(palette.fg3)
-            Text("Первое взвешивание")
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(palette.fg)
+        ContentUnavailableView {
+            Label("Первое взвешивание", systemImage: "scalemass")
+        } description: {
             Text("Наступите на весы — приложение подключится само и запишет вес.")
-                .font(.system(size: 15))
-                .multilineTextAlignment(.center)
-                .foregroundStyle(palette.fg2)
-                .padding(.horizontal, 40)
-            PrimaryButton(title: "Добавить вес вручную", action: onManualAdd)
-                .padding(.horizontal, 16)
-                .padding(.top, 10)
-            Spacer()
+        } actions: {
+            Button("Добавить вес вручную", action: onManualAdd)
+                .buttonStyle(.borderedProminent)
         }
-    }
-}
-
-// MARK: - Общая шапка «Вес» + дата последнего измерения
-
-private struct ScreenHeader: View {
-    @Environment(\.palette) private var palette
-    let lastLabel: String
-    var trailing: AnyView? = nil
-
-    var body: some View {
-        HStack(alignment: .lastTextBaseline) {
-            LargeTitle(text: "Вес")
-            Spacer()
-            if let trailing {
-                trailing
-            } else {
-                Text(lastLabel)
-                    .font(.system(size: 13))
-                    .foregroundStyle(palette.fg2)
-            }
-        }
-        .padding(.horizontal, 20)
     }
 }
 
@@ -94,8 +60,6 @@ private struct LayoutNumbers: View {
 
     var body: some View {
         VStack(spacing: 9) {
-            ScreenHeader(lastLabel: lastLabel)
-
             // Крупный вес и дельта за день
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .lastTextBaseline, spacing: 7) {
@@ -159,12 +123,8 @@ private struct LayoutNumbers: View {
             .padding(.top, 2)
 
             forecastSection
-
-            PrimaryButton(title: "Добавить вес вручную", action: onManualAdd)
-                .cardInset()
-                .padding(.top, 3)
         }
-        .padding(.top, 58)
+        .padding(.top, 8)
     }
 
     private var lastLabel: String {
@@ -328,7 +288,7 @@ private struct LayoutChart: View {
     private var hero: some View {
         GeometryReader { proxy in
             let size = CGSize(width: proxy.size.width, height: 322)
-            let inset = ChartGeometry.Padding(top: 152, bottom: 64, leading: 0, trailing: 0)
+            let inset = ChartGeometry.Padding(top: 120, bottom: 64, leading: 0, trailing: 0)
             let geo = ChartGeometry.build(
                 items: items, goal: settings.goalWeight, windowDays: window,
                 endDate: stats.last?.date ?? Date(), size: size, padding: inset,
@@ -372,13 +332,17 @@ private struct LayoutChart: View {
                     }
                 }
                 .padding(.leading, 20)
-                .padding(.top, 58)
+                .padding(.top, 8)
 
-                Segmented(items: [(30.0, "30 дней"), (90.0, "3 месяца"), (allDays, "Всё")],
-                          selection: $window)
-                    .padding(.horizontal, 16)
-                    .frame(width: proxy.size.width, height: 40, alignment: .bottom)
-                    .offset(y: 322 - 48)
+                Picker("Период", selection: $window) {
+                    Text("30 дней").tag(30.0)
+                    Text("3 месяца").tag(90.0)
+                    Text("Всё").tag(allDays)
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 16)
+                .frame(width: proxy.size.width, height: 40, alignment: .bottom)
+                .offset(y: 322 - 48)
             }
         }
         .frame(height: 322)
@@ -522,12 +486,6 @@ private struct LayoutGoal: View {
 
     var body: some View {
         VStack(spacing: 13) {
-            ScreenHeader(lastLabel: "", trailing: AnyView(
-                Button("Добавить", action: onManualAdd)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(palette.blue)
-            ))
-
             ring
             weekBars
             if settings.showForecast { forecastCard }
@@ -539,7 +497,7 @@ private struct LayoutGoal: View {
             }
             .cardInset()
         }
-        .padding(.top, 58)
+        .padding(.top, 8)
     }
 
     private var fatTile: some View {

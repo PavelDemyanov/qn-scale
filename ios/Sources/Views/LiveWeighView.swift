@@ -50,10 +50,9 @@ struct LiveWeighView: View {
 
             Spacer()
 
-            PrimaryButton(title: isDone ? "Готово" : "Отменить",
-                          background: isDone ? palette.blue : palette.card,
-                          foreground: isDone ? .white : palette.blue,
-                          action: onClose)
+            ActionButton(title: isDone ? "Готово" : "Отменить",
+                         kind: isDone ? .primary : .secondary,
+                         action: onClose)
         }
         .padding(.horizontal, 24)
         .padding(.top, 96)

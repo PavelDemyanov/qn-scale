@@ -19,23 +19,8 @@ struct ManualWeightSheet: View {
     }
 
     var body: some View {
+        NavigationStack {
         VStack(spacing: 0) {
-            HStack {
-                Button("Отмена") { dismiss() }
-                    .font(.system(size: 17))
-                    .foregroundStyle(palette.blue)
-                    .frame(width: 80, alignment: .leading)
-                Spacer()
-                Text("Вес вручную")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(palette.fg)
-                Spacer()
-                Spacer().frame(width: 80)
-            }
-            .padding(.horizontal, 18)
-            .padding(.top, 14)
-            .padding(.bottom, 10)
-
             HStack(alignment: .lastTextBaseline, spacing: 7) {
                 TextField(lastWeight.map { Fmt.n($0) } ?? "0,00", text: $text)
                     .font(.system(size: 56, weight: .semibold))
@@ -70,9 +55,7 @@ struct ManualWeightSheet: View {
 
             Spacer()
 
-            PrimaryButton(title: "Сохранить",
-                          background: weight == nil ? palette.card2 : palette.blue,
-                          foreground: weight == nil ? palette.fg3 : .white) {
+            ActionButton(title: "Сохранить") {
                 if let weight {
                     onSave(weight, date)
                     dismiss()
@@ -85,6 +68,12 @@ struct ManualWeightSheet: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(palette.sheet)
         .ignoresSafeArea(edges: .bottom)
+        .navigationTitle("Вес вручную")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) { Button("Отмена") { dismiss() } }
+        }
+        }
         .onAppear { focused = true }
     }
 }

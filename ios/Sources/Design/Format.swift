@@ -1,21 +1,21 @@
 import Foundation
 
-/// Форматирование как в прототипе: запятая-разделитель, настоящий минус (U+2212),
-/// «сегодня / вчера / позавчера» вместо дат.
+/// Форматирование. Числа и даты собирает система по локали устройства —
+/// своими остаются только правила, которых у неё нет: настоящий минус в дельтах
+/// и «сегодня / вчера / позавчера» вместо даты.
 enum Fmt {
-    static let monthsGenitive = ["января", "февраля", "марта", "апреля", "мая", "июня",
-                                 "июля", "августа", "сентября", "октября", "ноября", "декабря"]
-    static let monthsShort = ["янв", "фев", "мар", "апр", "мая", "июн",
-                              "июл", "авг", "сен", "окт", "ноя", "дек"]
-    static let weekdaysShort = ["вс", "пн", "вт", "ср", "чт", "пт", "сб"]
 
-    /// Число с запятой; nil и NaN превращаются в прочерк.
+    /// Число системным форматом: десятичный разделитель приходит из локали,
+    /// а не подставляется руками. nil и NaN превращаются в прочерк.
     static func n(_ v: Double?, _ digits: Int = 2) -> String {
         guard let v, !v.isNaN, !v.isInfinite else { return "—" }
-        return String(format: "%.\(digits)f", v).replacingOccurrences(of: ".", with: ",")
+        return v.formatted(.number.precision(.fractionLength(digits)).grouping(.never))
     }
 
     /// Со знаком: «+0,25», «−0,40», «0,00».
+    /// Системный `.sign(strategy: .always())` тут не годится: он ставит обычный
+    /// дефис вместо типографского минуса (тот одной ширины с плюсом, и колонка
+    /// дельт не дёргается) и печатает знак даже у ровного нуля.
     static func signed(_ v: Double, _ digits: Int = 2) -> String {
         let sign = v > 0.0049 ? "+" : v < -0.0049 ? "\u{2212}" : ""
         return sign + n(abs(v), digits)
@@ -27,6 +27,7 @@ enum Fmt {
 
     private static var cal: Calendar { Calendar.current }
 
+    /// «сегодня» / «вчера» / «позавчера», дальше — дата с днём недели.
     static func dayLabel(_ date: Date, now: Date = Date()) -> String {
         let days = cal.dateComponents([.day], from: cal.startOfDay(for: date),
                                       to: cal.startOfDay(for: now)).day ?? 0
@@ -35,30 +36,25 @@ enum Fmt {
         case 1: return "вчера"
         case 2: return "позавчера"
         default:
-            let c = cal.dateComponents([.day, .month, .weekday], from: date)
-            return "\(c.day ?? 1) \(monthsShort[(c.month ?? 1) - 1]), \(weekdaysShort[(c.weekday ?? 1) - 1])"
+            return date.formatted(.dateTime.day().month(.abbreviated).weekday(.abbreviated))
         }
     }
 
     static func time(_ date: Date) -> String {
-        let c = cal.dateComponents([.hour, .minute], from: date)
-        return "\(c.hour ?? 0):" + String(format: "%02d", c.minute ?? 0)
+        date.formatted(date: .omitted, time: .shortened)
     }
 
     /// «пн, 12 августа»
     static func fullDate(_ date: Date) -> String {
-        let c = cal.dateComponents([.day, .month, .weekday], from: date)
-        return "\(weekdaysShort[(c.weekday ?? 1) - 1]), \(c.day ?? 1) \(monthsGenitive[(c.month ?? 1) - 1])"
+        date.formatted(.dateTime.weekday(.abbreviated).day().month(.wide))
     }
 
     /// «14 сентября» — для даты достижения цели
     static func dayMonth(_ date: Date) -> String {
-        let c = cal.dateComponents([.day, .month], from: date)
-        return "\(c.day ?? 1) \(monthsGenitive[(c.month ?? 1) - 1])"
+        date.formatted(.dateTime.day().month(.wide))
     }
 
     static func shortDayMonth(_ date: Date) -> String {
-        let c = cal.dateComponents([.day, .month], from: date)
-        return "\(c.day ?? 1) \(monthsShort[(c.month ?? 1) - 1])"
+        date.formatted(.dateTime.day().month(.abbreviated))
     }
 }

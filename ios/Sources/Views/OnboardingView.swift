@@ -46,7 +46,7 @@ struct OnboardingView: View {
             .frame(maxWidth: .infinity)
             .padding(.bottom, 22)
 
-            PrimaryButton(title: buttonTitle) {
+            ActionButton(title: buttonTitle) {
                 switch step {
                 case 0: searchingScale = true
                 case 1: step = 2

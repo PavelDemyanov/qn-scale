@@ -18,9 +18,8 @@ struct ConnectSheet: View {
     }
 
     var body: some View {
+        NavigationStack {
         VStack(spacing: 0) {
-            header
-
             VStack(spacing: 0) {
                 indicator
                     .padding(.top, 10)
@@ -47,11 +46,7 @@ struct ConnectSheet: View {
 
             Spacer()
 
-            // Неактивная кнопка — card2, а не card: у карточки и шторки одинаковый
-            // цвет, и на этом фоне кнопка была бы невидима.
-            PrimaryButton(title: buttonTitle,
-                          background: buttonEnabled ? palette.blue : palette.card2,
-                          foreground: buttonEnabled ? .white : palette.fg3) {
+            ActionButton(title: buttonTitle) {
                 switch step {
                 case .found: scale.confirmPairing()
                 case .done: dismiss()
@@ -68,6 +63,12 @@ struct ConnectSheet: View {
         .background(palette.sheet)
         // Отступ 34 у кнопки — от края экрана, как в макете
         .ignoresSafeArea(edges: .bottom)
+        .navigationTitle("Поиск весов")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) { Button("Отмена") { dismiss() } }
+        }
+        }
         .onAppear {
             pulse = true
             scale.startPairing()
@@ -78,26 +79,6 @@ struct ConnectSheet: View {
         .onChange(of: scale.scaleMAC) { _, mac in
             if let mac { settings.knownScaleMAC = mac }
         }
-    }
-
-    private var header: some View {
-        HStack {
-            Button("Отмена") { dismiss() }
-                .font(.system(size: 17))
-                .foregroundStyle(palette.blue)
-                .frame(width: 80, alignment: .leading)
-            Spacer()
-            Text("Поиск весов")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(palette.fg)
-            Spacer()
-            // Уравновешивает «Отмену» слева, чтобы заголовок стоял по центру.
-            // Именно Spacer, а не Color: цвет тянется и по вертикали и раздувает шапку.
-            Spacer().frame(width: 80)
-        }
-        .padding(.horizontal, 18)
-        .padding(.top, 14)
-        .padding(.bottom, 10)
     }
 
     private var indicator: some View {

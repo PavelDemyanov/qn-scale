@@ -1,10 +1,13 @@
 import SwiftUI
 
-/// Одна фигура графика. Всё рисуется из одних и тех же параметров окна,
-/// а `animatableData` — это само окно: при смене периода SwiftUI плавно
-/// интерполирует его, и кривая, заливка, точки и пунктир едут вместе.
+/// Одна фигура графика. Все части (кривая, заливка, точки, пунктир) строятся
+/// из одних и тех же параметров окна, поэтому не расходятся между собой.
+///
+/// `animatableData` НЕТ намеренно: анимация окна (плавная смена периода и
+/// панорамирование) владельцу не понравилась и снята 12.08.2026 — график
+/// перерисовывается сразу, как было до неё.
 struct WeightCurve: Shape {
-    enum Kind { case line, area, forecast, dots, goalLine }
+    enum Kind { case line, lineSolid, lineGap, area, forecast, dots, goalLine }
 
     let items: [WeighIn]
     let goal: Double
@@ -15,11 +18,6 @@ struct WeightCurve: Shape {
     let kind: Kind
     var windowDays: Double
     var endTime: TimeInterval
-
-    var animatableData: AnimatablePair<Double, Double> {
-        get { AnimatablePair(windowDays, endTime) }
-        set { windowDays = newValue.first; endTime = newValue.second }
-    }
 
     func geometry(in size: CGSize) -> ChartGeometry {
         ChartGeometry.build(items: items, goal: goal,
@@ -33,9 +31,11 @@ struct WeightCurve: Shape {
     func path(in rect: CGRect) -> Path {
         let geo = geometry(in: rect.size)
         switch kind {
-        case .line:     return geo.line
-        case .area:     return geo.area
-        case .forecast: return geo.forecast
+        case .line:      return geo.line
+        case .lineSolid: return geo.lineSolid
+        case .lineGap:   return geo.lineGap
+        case .area:      return geo.area
+        case .forecast:  return geo.forecast
         case .dots:
             var p = Path()
             for sample in geo.samples {
@@ -107,7 +107,13 @@ struct WeightChart: View {
                     .stroke(palette.fg3, style: StrokeStyle(lineWidth: 1.9, lineCap: .round, dash: [3, 4]))
             }
 
-            curve(.line)
+            // Интерполяция — серым и тоньше: на этом отрезке взвешиваний
+            // не было, и выдавать домысел за данные нельзя.
+            curve(.lineGap)
+                .stroke(palette.fg3, style: StrokeStyle(lineWidth: lineWidth * 0.8,
+                                                        lineCap: .round, lineJoin: .round))
+
+            curve(.lineSolid)
                 .stroke(palette.blue, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round))
 
             if showDots {
