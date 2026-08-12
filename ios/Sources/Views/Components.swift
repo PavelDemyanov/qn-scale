@@ -5,13 +5,20 @@ import SwiftUI
 struct CardBackground: ViewModifier {
     @Environment(\.palette) private var palette
     var radius: CGFloat = 22
+    var onSheet = false
     func body(content: Content) -> some View {
-        content.background(palette.card, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+        content.background(onSheet ? palette.cardOnSheet : palette.card,
+                           in: RoundedRectangle(cornerRadius: radius, style: .continuous))
     }
 }
 
 extension View {
     func card(radius: CGFloat = 22) -> some View { modifier(CardBackground(radius: radius)) }
+
+    /// То же, но для карточек внутри шторки — там нужен другой тон.
+    func sheetCard(radius: CGFloat = 22) -> some View {
+        modifier(CardBackground(radius: radius, onSheet: true))
+    }
 
     /// Горизонтальные отступы карточек — 16 пунктов от края экрана.
     func cardInset() -> some View { padding(.horizontal, 16) }
@@ -40,7 +47,7 @@ struct SectionFooter: View {
     var body: some View {
         Text(text)
             .font(.system(size: 12))
-            .lineSpacing(1)
+            .lineSpacing(4)   // line-height 1.4 из макета
             .foregroundStyle(palette.fg3)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 36)
@@ -198,6 +205,30 @@ struct DeltaTile: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .card(radius: 18)
+    }
+}
+
+/// Циферблат весов из макета: окружность, стрелка из центра и точка оси.
+/// Рисуем сами — у системного «scalemass» другой силуэт.
+struct ScaleDialIcon: View {
+    var size: CGFloat = 40
+    var lineWidth: CGFloat = 2
+
+    var body: some View {
+        let k = size / 40
+        ZStack {
+            Circle()
+                .stroke(lineWidth: lineWidth)
+                .frame(width: 32 * k, height: 32 * k)
+            Path { p in
+                p.move(to: CGPoint(x: 20 * k, y: 20 * k))
+                p.addLine(to: CGPoint(x: 28 * k, y: 12.5 * k))
+            }
+            .stroke(style: StrokeStyle(lineWidth: lineWidth * 1.2, lineCap: .round))
+            .frame(width: size, height: size)
+            Circle().frame(width: 5.6 * k, height: 5.6 * k)
+        }
+        .frame(width: size, height: size)
     }
 }
 

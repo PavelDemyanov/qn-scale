@@ -22,6 +22,12 @@ struct HistoryView: View {
         return items.filter { $0.date >= start && $0.date <= effectiveEnd }
     }
 
+    /// «Всё» — ровно длина истории, а не условные десять лет.
+    private var allDays: Double {
+        guard let first = items.first?.date, let last = items.last?.date else { return 30 }
+        return max(7, last.timeIntervalSince(first) / 86_400 + 1)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             LargeTitle(text: "История")
@@ -32,14 +38,13 @@ struct HistoryView: View {
             if items.isEmpty {
                 emptyState
             } else {
-                Segmented(items: [(7.0, "7 дней"), (30.0, "30 дней"), (90.0, "90 дней"), (3650.0, "Всё")],
-                          selection: $windowDays)
+                // Сброс сдвига и выделения — только при выборе периода кнопкой.
+                // На onChange он бы срабатывал и на каждом шаге щипка, отменяя сдвиг.
+                Segmented(items: [(7.0, "7 дней"), (30.0, "30 дней"), (90.0, "90 дней"), (allDays, "Всё")],
+                          selection: Binding(get: { windowDays },
+                                             set: { windowDays = $0; endDate = nil; selected = nil }))
                     .cardInset()
                     .padding(.bottom, 14)
-                    .onChange(of: windowDays) { _, _ in
-                        endDate = nil
-                        selected = nil
-                    }
 
                 chartCard
                 summarySection
@@ -125,24 +130,28 @@ struct HistoryView: View {
         let selPoint = selected.flatMap { s in geo.samples.first { $0.item.id == s.id }?.point }
 
         return ZStack(alignment: .topLeading) {
-            WeightChart(geometry: geo,
-                        showDots: windowDays <= 45,
-                        selected: selPoint)
-
-            // Горизонтальные засечки и подписи по оси весов
+            // Засечки идут ПЕРВЫМИ — иначе серые волоски ложатся поверх кривой.
             ForEach(0..<4, id: \.self) { i in
-                let w = geo.lo + (geo.hi - geo.lo) * (Double(i) / 3)
-                let y = geo.y(w)
+                let y = geo.y(geo.lo + (geo.hi - geo.lo) * (Double(i) / 3))
                 Rectangle()
                     .fill(palette.sep)
                     .frame(width: size.width - 40, height: 0.5)
                     .position(x: (size.width - 40) / 2, y: y)
+            }
+
+            WeightChart(geometry: geo,
+                        showDots: windowDays <= 45,
+                        selected: selPoint)
+
+            // Подписи по оси весов — справа от поля графика
+            ForEach(0..<4, id: \.self) { i in
+                let w = geo.lo + (geo.hi - geo.lo) * (Double(i) / 3)
                 Text(Fmt.n(w, 1))
                     .font(.system(size: 10.5))
                     .monospacedDigit()
                     .foregroundStyle(palette.fg3)
                     .frame(width: 38, alignment: .trailing)
-                    .position(x: size.width - 19, y: y)
+                    .position(x: size.width - 19, y: geo.y(w))
             }
 
             if geo.goalInRange {
@@ -164,8 +173,10 @@ struct HistoryView: View {
             }
 
             if let selected, let point = selPoint {
+                // Смещение, а не .position: тот задаёт центр, и подсказка вылезала
+                // за верхний край графика. Левый край — как в макете, с зажимом.
                 tooltip(for: selected)
-                    .position(x: min(max(58, point.x), size.width - 58), y: 26)
+                    .offset(x: min(max(0, point.x - 50), max(0, size.width - 156)), y: 2)
             }
         }
         .contentShape(Rectangle())

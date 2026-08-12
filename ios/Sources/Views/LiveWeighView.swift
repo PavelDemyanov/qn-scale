@@ -32,6 +32,7 @@ struct LiveWeighView: View {
             HStack(alignment: .lastTextBaseline, spacing: 7) {
                 Text(scale.liveWeightKg.map { Fmt.n($0) } ?? "—")
                     .font(.system(size: 72, weight: .semibold))
+                    .tracking(-2)
                     .monospacedDigit()
                     .foregroundStyle(isDone ? palette.fg : palette.fg2)
                     .contentTransition(.numericText())
@@ -59,6 +60,8 @@ struct LiveWeighView: View {
         .padding(.bottom, 34)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(palette.bg)
+        // Отступы 96 сверху и 34 снизу в макете — от краёв экрана.
+        .ignoresSafeArea()
         .animation(.smooth, value: scale.state)
         .animation(.smooth, value: scale.liveWeightKg)
         .onAppear { pulse = true }
@@ -66,7 +69,8 @@ struct LiveWeighView: View {
 
     private var indicator: some View {
         ZStack {
-            if !isDone {
+            // Кольца пульсируют только пока ждём, что на весы встанут (фаза 0).
+            if scale.state.phase == 0 {
                 ForEach(0..<2, id: \.self) { i in
                     Circle()
                         .stroke(palette.blue, lineWidth: 2)
@@ -80,8 +84,7 @@ struct LiveWeighView: View {
             Circle()
                 .fill(isDone ? palette.green.opacity(0.18) : palette.seg)
                 .frame(width: 82, height: 82)
-            Image(systemName: "scalemass")
-                .font(.system(size: 32, weight: .light))
+            ScaleDialIcon(size: 40, lineWidth: 2)
                 .foregroundStyle(isDone ? palette.green : palette.blue)
         }
         .frame(width: 128, height: 128)

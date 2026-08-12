@@ -40,14 +40,16 @@ struct HealthImportSheet: View {
             if stage == .options {
                 optionsCard.padding(.top, 22)
             }
-            if stage == .running {
+            // На финальном шаге полоса остаётся заполненной — иначе содержимое
+            // прыгает в момент, когда импорт закончился.
+            if stage == .running || stage == .done {
                 progressBar.padding(.top, 28)
             }
 
             Spacer()
 
             PrimaryButton(title: buttonTitle,
-                          background: buttonEnabled ? palette.blue : palette.card,
+                          background: buttonEnabled ? palette.blue : palette.card2,
                           foreground: buttonEnabled ? .white : palette.fg3) {
                 if stage == .options { runImport() } else if stage == .done { dismiss() }
             }
@@ -55,8 +57,10 @@ struct HealthImportSheet: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 34)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(palette.sheet)
+        // Отступ 34 у кнопки — от края экрана, как в макете
+        .ignoresSafeArea(edges: .bottom)
         .task { await loadPreview() }
     }
 
@@ -71,7 +75,8 @@ struct HealthImportSheet: View {
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(palette.fg)
             Spacer()
-            Color.clear.frame(width: 80)
+            // Не Color: он растягивается по вертикали и раздувает шапку на всю шторку.
+            Spacer().frame(width: 80)
         }
         .padding(.horizontal, 18)
         .padding(.top, 14)
@@ -131,7 +136,7 @@ struct HealthImportSheet: View {
                     .foregroundStyle(palette.fg2)
             }
         }
-        .card(radius: 20)
+        .sheetCard(radius: 20)
         .cardInset()
     }
 

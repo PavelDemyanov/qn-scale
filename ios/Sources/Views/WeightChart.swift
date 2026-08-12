@@ -16,11 +16,26 @@ struct WeightChart: View {
     var lineWidth: CGFloat = 2.3
     var selected: CGPoint? = nil
 
+    private var areaTop: CGFloat {
+        guard geometry.size.height > 0 else { return 0 }
+        return max(0, geometry.area.boundingRect.minY / geometry.size.height)
+    }
+
+    private var areaBottom: CGFloat {
+        guard geometry.size.height > 0 else { return 1 }
+        return min(1, geometry.area.boundingRect.maxY / geometry.size.height)
+    }
+
     var body: some View {
         ZStack(alignment: .topLeading) {
+            // Градиент привязан к габаритам самой заливки, а не ко всей вью:
+            // в макете это SVG-градиент в objectBoundingBox, то есть он всегда
+            // начинается у вершины кривой и гаснет у её основания.
             PrebuiltPath(path: geometry.area)
-                .fill(LinearGradient(colors: [palette.blue.opacity(0.3), palette.blue.opacity(0)],
-                                     startPoint: .top, endPoint: .bottom))
+                .fill(LinearGradient(
+                    colors: [palette.blue.opacity(0.3), palette.blue.opacity(0)],
+                    startPoint: UnitPoint(x: 0.5, y: areaTop),
+                    endPoint: UnitPoint(x: 0.5, y: areaBottom)))
 
             if showGoalLine && geometry.goalInRange {
                 Path { p in

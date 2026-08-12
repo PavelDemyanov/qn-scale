@@ -35,30 +35,24 @@ struct TabBar: View {
             }
         }
         .frame(height: 82, alignment: .top)
-        // Заливка уходит под домашний индикатор, иначе контент просвечивает снизу.
         .background {
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .ignoresSafeArea(edges: .bottom)
+            // Матовое стекло плюс тон из макета (--tabbg): у голого материала
+            // другая плотность, и панель выходит светлее.
+            Rectangle().fill(.ultraThinMaterial)
+                .overlay(palette.tabBar)
         }
         .overlay(alignment: .top) { RowSeparator() }
+        // В макете панель ровно 82 пункта и стоит вплотную к низу экрана —
+        // зона домашнего индикатора входит в эти 82, а не добавляется к ним.
+        .ignoresSafeArea(edges: .bottom)
     }
 
     @ViewBuilder
     private func icon(for tab: Tab) -> some View {
         switch tab {
         case .weigh:
-            // Циферблат весов — та же иконка, что на диске взвешивания.
-            ZStack {
-                Circle().stroke(lineWidth: 1.7).frame(width: 20, height: 20)
-                Path { p in
-                    p.move(to: CGPoint(x: 13.5, y: 13.5))
-                    p.addLine(to: CGPoint(x: 19.2, y: 8.4))
-                }
-                .stroke(style: StrokeStyle(lineWidth: 1.9, lineCap: .round))
-                .frame(width: 27, height: 27)
-                Circle().frame(width: 3.8, height: 3.8)
-            }
+            // Тот же циферблат, что на диске взвешивания.
+            ScaleDialIcon(size: 27, lineWidth: 1.7)
         case .history:
             Path { p in
                 p.move(to: CGPoint(x: 3.5, y: 18.5))

@@ -210,15 +210,9 @@ private struct SparkCard: View {
     let items: [WeighIn]
     let onTap: () -> Void
 
-    private let size = CGSize(width: 321, height: 86)
+    private let height: CGFloat = 86
 
     var body: some View {
-        let geo = ChartGeometry.build(
-            items: items, goal: settings.goalWeight, windowDays: 30,
-            endDate: stats.last?.date ?? Date(), size: size,
-            padding: .init(top: 5, bottom: 5, leading: 3, trailing: 3),
-            forecastDays: 9, slope: stats.slope)
-
         Button(action: onTap) {
             VStack(spacing: 0) {
                 HStack {
@@ -227,9 +221,13 @@ private struct SparkCard: View {
                         .foregroundStyle(palette.fg)
                     Spacer()
                     HStack(spacing: 6) {
-                        Rectangle()
-                            .fill(palette.green)
-                            .frame(width: 14, height: 1.5)
+                        // Пунктир, как линия цели на самом графике
+                        Path { p in
+                            p.move(to: CGPoint(x: 0, y: 0.75))
+                            p.addLine(to: CGPoint(x: 14, y: 0.75))
+                        }
+                        .stroke(palette.green, style: StrokeStyle(lineWidth: 1.5, dash: [4, 4]))
+                        .frame(width: 14, height: 1.5)
                         Text("цель \(Fmt.n(settings.goalWeight, 1))")
                             .font(.system(size: 12))
                             .monospacedDigit()
@@ -239,16 +237,25 @@ private struct SparkCard: View {
                 .padding(.horizontal, 4)
                 .padding(.bottom, 8)
 
-                ZStack(alignment: .topLeading) {
-                    WeightChart(geometry: geo, lineWidth: 2.2)
-                    if let end = geo.lastPoint {
-                        ChartEndDot(point: end, ringColor: palette.card)
+                GeometryReader { proxy in
+                    let geo = ChartGeometry.build(
+                        items: items, goal: settings.goalWeight, windowDays: 30,
+                        endDate: stats.last?.date ?? Date(),
+                        size: CGSize(width: proxy.size.width, height: height),
+                        padding: .init(top: 5, bottom: 5, leading: 3, trailing: 3),
+                        forecastDays: 9, slope: stats.slope)
+
+                    ZStack(alignment: .topLeading) {
+                        WeightChart(geometry: geo, lineWidth: 2.2)
+                        if let end = geo.lastPoint {
+                            ChartEndDot(point: end, ringColor: palette.card)
+                        }
                     }
                 }
-                .frame(width: size.width, height: size.height)
+                .frame(height: height)
 
                 HStack {
-                    Text(geo.samples.first.map { Fmt.shortDayMonth($0.item.date) } ?? "")
+                    Text(firstVisibleLabel)
                     Spacer()
                     Text("сегодня")
                 }
@@ -265,6 +272,13 @@ private struct SparkCard: View {
         .buttonStyle(.plain)
         .cardInset()
     }
+
+    /// Дата первого измерения в окне 30 дней — подпись слева под спарклайном.
+    private var firstVisibleLabel: String {
+        let from = (stats.last?.date ?? Date()).addingTimeInterval(-30 * 86_400)
+        guard let first = items.first(where: { $0.date >= from }) else { return "" }
+        return Fmt.shortDayMonth(first.date)
+    }
 }
 
 // MARK: - Компоновка «График»
@@ -278,6 +292,13 @@ private struct LayoutChart: View {
     let onOpenDay: (WeighIn) -> Void
 
     @State private var window: Double = 30
+
+    /// «Всё» — это вся история, а не условные десять лет: иначе данные сжимаются
+    /// в точку у правого края, а прогноз уезжает на треть этого срока вперёд.
+    private var allDays: Double {
+        guard let first = items.first?.date, let last = items.last?.date else { return 30 }
+        return max(7, last.timeIntervalSince(first) / 86_400 + 1)
+    }
 
     var body: some View {
         VStack(spacing: 13) {
@@ -331,7 +352,7 @@ private struct LayoutChart: View {
                 .padding(.leading, 20)
                 .padding(.top, 58)
 
-                Segmented(items: [(30.0, "30 дней"), (90.0, "3 месяца"), (3650.0, "Всё")],
+                Segmented(items: [(30.0, "30 дней"), (90.0, "3 месяца"), (allDays, "Всё")],
                           selection: $window)
                     .padding(.horizontal, 16)
                     .frame(width: proxy.size.width, height: 40, alignment: .bottom)
@@ -349,13 +370,23 @@ private struct LayoutChart: View {
     private var deltaRow: some View {
         HStack(spacing: 0) {
             column("ДЕНЬ", stats.dayDelta)
-            RowSeparator().frame(width: 0.5).padding(.vertical, 12)
+            verticalSeparator
             column("НЕДЕЛЯ", stats.weekDelta)
-            RowSeparator().frame(width: 0.5).padding(.vertical, 12)
+            verticalSeparator
             column("МЕСЯЦ", stats.monthDelta)
         }
         .card(radius: 20)
         .cardInset()
+    }
+
+    /// Волосяная линия во всю высоту. RowSeparator тут не годится: у него
+    /// зафиксирована высота 0,5, и вертикальный разделитель вырождается в точку.
+    private var verticalSeparator: some View {
+        Rectangle()
+            .fill(palette.sep)
+            .frame(width: 0.5)
+            .frame(maxHeight: .infinity)
+            .padding(.vertical, 12)
     }
 
     private func column(_ caption: String, _ value: Double?) -> some View {
@@ -381,6 +412,8 @@ private struct LayoutChart: View {
                         .foregroundStyle(palette.fg)
                     Text(subtitle)
                         .font(.system(size: 12.5))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                         .foregroundStyle(palette.fg2)
                 }
                 Spacer()
@@ -544,19 +577,24 @@ private struct LayoutGoal: View {
             }
         }
         .frame(width: 214, height: 214)
+        // В макете подписи стартового и целевого веса привязаны к краям экрана
+        // (left:24 / right:24, bottom:14), а не к краям кольца.
+        .frame(maxWidth: .infinity)
         .overlay(alignment: .bottomLeading) {
             Text(Fmt.n(stats.startWeight, 1))
                 .font(.system(size: 12))
                 .monospacedDigit()
                 .foregroundStyle(palette.fg3)
-                .offset(x: -18, y: -4)
+                .padding(.leading, 24)
+                .padding(.bottom, 14)
         }
         .overlay(alignment: .bottomTrailing) {
             Text(Fmt.n(settings.goalWeight, 1))
                 .font(.system(size: 12, weight: .semibold))
                 .monospacedDigit()
                 .foregroundStyle(palette.green)
-                .offset(x: 18, y: -4)
+                .padding(.trailing, 24)
+                .padding(.bottom, 14)
         }
     }
 
@@ -592,6 +630,7 @@ private struct LayoutGoal: View {
                             .frame(height: barHeight(bar.delta))
                         Text(bar.weekday)
                             .font(.system(size: 11))
+                            .textCase(.uppercase)
                             .foregroundStyle(palette.fg3)
                     }
                     .frame(maxWidth: .infinity)

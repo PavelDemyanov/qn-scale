@@ -47,8 +47,10 @@ struct ConnectSheet: View {
 
             Spacer()
 
+            // Неактивная кнопка — card2, а не card: у карточки и шторки одинаковый
+            // цвет, и на этом фоне кнопка была бы невидима.
             PrimaryButton(title: buttonTitle,
-                          background: buttonEnabled ? palette.blue : palette.card,
+                          background: buttonEnabled ? palette.blue : palette.card2,
                           foreground: buttonEnabled ? .white : palette.fg3) {
                 switch step {
                 case .found: scale.confirmPairing()
@@ -60,8 +62,12 @@ struct ConnectSheet: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 34)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // alignment: .top тут — страховка на случай, если исчезнет Spacer выше;
+        // сама раскладка ломалась не из-за него, а из-за распорки в шапке (см. header).
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(palette.sheet)
+        // Отступ 34 у кнопки — от края экрана, как в макете
+        .ignoresSafeArea(edges: .bottom)
         .onAppear {
             pulse = true
             scale.startPairing()
@@ -85,7 +91,9 @@ struct ConnectSheet: View {
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(palette.fg)
             Spacer()
-            Color.clear.frame(width: 80)
+            // Уравновешивает «Отмену» слева, чтобы заголовок стоял по центру.
+            // Именно Spacer, а не Color: цвет тянется и по вертикали и раздувает шапку.
+            Spacer().frame(width: 80)
         }
         .padding(.horizontal, 18)
         .padding(.top, 14)
@@ -155,7 +163,7 @@ struct ConnectSheet: View {
                 .background(palette.blue, in: Capsule())
                 .buttonStyle(.plain)
         }
-        .card(radius: 20)
+        .sheetCard(radius: 20)
         .cardInset()
     }
 
@@ -169,7 +177,7 @@ struct ConnectSheet: View {
             RowSeparator()
             stepRow("Поток измерений", "0x10", scale.handshake.streaming)
         }
-        .card(radius: 20)
+        .sheetCard(radius: 20)
         .cardInset()
     }
 

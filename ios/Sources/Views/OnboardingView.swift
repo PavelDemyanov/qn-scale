@@ -6,11 +6,12 @@ struct OnboardingView: View {
     @Environment(\.palette) private var palette
     @Environment(AppSettings.self) private var settings
 
-    let onSearchScale: () -> Void
+    let sheetHeight: CGFloat
     let onFinish: () -> Void
 
     @State private var step = 0
     @State private var editingProfile = false
+    @State private var searchingScale = false
 
     var body: some View {
         @Bindable var s = settings
@@ -47,13 +48,9 @@ struct OnboardingView: View {
 
             PrimaryButton(title: buttonTitle) {
                 switch step {
-                case 0:
-                    onSearchScale()
-                    step = 1
-                case 1:
-                    step = 2
-                default:
-                    finish()
+                case 0: searchingScale = true
+                case 1: step = 2
+                default: finish()
                 }
             }
 
@@ -68,9 +65,16 @@ struct OnboardingView: View {
         .padding(.bottom, 34)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .background(palette.bg)
+        // Отступы 104 и 34 в макете отсчитываются от краёв экрана, а не от безопасной зоны.
+        .ignoresSafeArea()
         .animation(.smooth, value: step)
         .sheet(isPresented: $editingProfile) {
             ProfileEditorView().environment(settings)
+        }
+        .sheet(isPresented: $searchingScale, onDismiss: { if step == 0 { step = 1 } }) {
+            ConnectSheet()
+                .presentationDetents([.height(sheetHeight)])
+                .presentationCornerRadius(22)
         }
     }
 
@@ -129,6 +133,8 @@ struct OnboardingView: View {
                     Text("\(Fmt.n(settings.goalWeight, 1)) кг")
                         .font(.system(size: 16))
                         .monospacedDigit()
+                        .lineLimit(1)
+                        .fixedSize()
                         .foregroundStyle(palette.fg2)
                     HStack(spacing: 0) {
                         Button { settings.goalWeight = max(40, settings.goalWeight - 0.5) } label: {

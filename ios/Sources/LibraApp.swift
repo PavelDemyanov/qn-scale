@@ -41,9 +41,24 @@ struct RootView: View {
         var id: Int { self == .connect ? 0 : 1 }
     }
 
+    /// Полная высота экрана — от неё считаются высоты шторок, как в макете
+    /// (шторка поиска начинается в 120 пунктах от верха, импорт — в 150, день — в 300).
+    @State private var screenHeight: CGFloat = 874
+
+    private func sheetHeight(topInset: CGFloat) -> CGFloat {
+        max(320, screenHeight - topInset)
+    }
+
     var body: some View {
         ZStack(alignment: .bottom) {
             palette.bg.ignoresSafeArea()
+
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear { screenHeight = proxy.size.height }
+                    .onChange(of: proxy.size.height) { _, new in screenHeight = new }
+            }
+            .ignoresSafeArea()
 
             ScrollView {
                 switch tab {
@@ -63,7 +78,10 @@ struct RootView: View {
                 }
             }
             .scrollIndicators(.hidden)
-            .ignoresSafeArea(edges: .bottom)
+            // Отсчёт от физического верха экрана, как в макете: там все экраны
+            // начинаются с отступа 58, а статус-бар лежит поверх содержимого.
+            // Без этого отступ «плавает» между запусками.
+            .ignoresSafeArea(edges: [.top, .bottom])
             // Своя прокрутка на вкладку: иначе позиция переносится с предыдущей.
             .id(tab)
 
@@ -82,24 +100,26 @@ struct RootView: View {
             }
         }
         .fullScreenCover(isPresented: $showOnboarding) {
-            OnboardingView(onSearchScale: { sheet = .connect },
+            // Шторку поиска онбординг показывает сам: два модальных экрана с одного
+            // контроллера UIKit не показывает, и запрос молча терялся.
+            OnboardingView(sheetHeight: sheetHeight(topInset: 120),
                            onFinish: { showOnboarding = false })
         }
         .sheet(item: $sheet) { which in
             switch which {
             case .connect:
                 ConnectSheet()
-                    .presentationDetents([.fraction(0.86)])
+                    .presentationDetents([.height(sheetHeight(topInset: 120))])
                     .presentationCornerRadius(22)
             case .healthImport:
                 HealthImportSheet(items: items)
-                    .presentationDetents([.fraction(0.78)])
+                    .presentationDetents([.height(sheetHeight(topInset: 150))])
                     .presentationCornerRadius(22)
             }
         }
         .sheet(item: $selectedDay) { item in
             DaySheet(item: item, delta: delta(for: item)) { delete(item) }
-                .presentationDetents([.fraction(0.55)])
+                .presentationDetents([.height(sheetHeight(topInset: 300))])
                 .presentationCornerRadius(22)
         }
     }

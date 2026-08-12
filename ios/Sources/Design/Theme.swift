@@ -28,6 +28,10 @@ enum Palette {
     var tabIcon: Color { self == .dark ? c(0xEBEBF5, 0.38) : c(0x3C3C43, 0.42) }
     var sheet: Color { self == .dark ? c(0x1C1C1E) : c(0xF2F2F7) }
 
+    /// Карточка на фоне шторки. В тёмной теме обычный цвет карточки совпадает
+    /// с цветом шторки, и она пропадает, — там берём тон светлее.
+    var cardOnSheet: Color { self == .dark ? card2 : card }
+
     /// Зелёный — вес ушёл, оранжевый — пришёл.
     func delta(_ v: Double) -> Color {
         v < -0.0049 ? green : v > 0.0049 ? orange : fg2

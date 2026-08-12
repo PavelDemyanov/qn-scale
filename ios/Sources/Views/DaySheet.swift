@@ -49,14 +49,14 @@ struct DaySheet: View {
                 RowSeparator()
                 row("В «Здоровье»", item.syncedToHealth ? "записано" : "нет")
             }
-            .card(radius: 20)
+            .sheetCard(radius: 20)
             .cardInset()
             .padding(.top, 18)
 
             Spacer()
 
             PrimaryButton(title: "Удалить измерение",
-                          background: palette.card,
+                          background: palette.card2,
                           foreground: palette.red) {
                 onDelete()
                 dismiss()
@@ -64,8 +64,10 @@ struct DaySheet: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 34)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(palette.sheet)
+        // Отступ 34 у кнопки — от края экрана, как в макете
+        .ignoresSafeArea(edges: .bottom)
     }
 
     private func row(_ label: String, _ value: String) -> some View {

@@ -38,11 +38,19 @@ struct SettingsView: View {
                 }
                 .buttonStyle(.plain)
                 RowSeparator()
-                Row(title: "Версия", minHeight: 46) {
+                // «Версия» — служебная строка: 15 пунктов приглушённым, как в макете,
+                // иначе она выглядит такой же важной, как действия выше.
+                HStack {
+                    Text("Версия")
+                        .font(.system(size: 15))
+                        .foregroundStyle(palette.fg2)
+                    Spacer()
                     Text("1.0 (1)")
                         .font(.system(size: 15))
                         .foregroundStyle(palette.fg3)
                 }
+                .padding(.horizontal, 18)
+                .frame(minHeight: 46)
             }
             .card()
             .cardInset()
