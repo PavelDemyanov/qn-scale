@@ -6,16 +6,26 @@ struct LibraApp: App {
     @State private var settings = AppSettings()
     @State private var scale = ScaleManager()
     @State private var health = HealthStore()
+    /// Выбранная вкладка живёт ЗДЕСЬ, выше пересборки дерева по языку:
+    /// иначе переключение языка в настройках выбрасывало на первую вкладку.
+    @State private var tab: Tab = .weigh
 
     var body: some Scene {
         WindowGroup {
-            RootView()
+            RootView(tab: $tab)
                 .environment(settings)
                 .environment(scale)
                 .environment(health)
                 .environment(\.palette, settings.palette)
+                // Локаль системных элементов (выбор даты, форматы) идёт за
+                // языком приложения, а не за языком телефона.
+                .environment(\.locale, L10n.locale)
                 .preferredColorScheme(settings.theme.colorScheme)
                 .tint(settings.palette.blue)
+                // Пересборка всего дерева при смене языка: строки берутся
+                // функцией `L()`, а не свойством наблюдаемого объекта, и сами
+                // по себе SwiftUI перерисовать не заставят.
+                .id(settings.language)
         }
         .modelContainer(for: WeighIn.self)
     }
@@ -38,9 +48,9 @@ enum Tab: String, CaseIterable {
 
     var title: String {
         switch self {
-        case .weigh: return "Вес"
-        case .history: return "История"
-        case .settings: return "Настройки"
+        case .weigh: return L("Weight")
+        case .history: return L("History")
+        case .settings: return L("Settings")
         }
     }
 
@@ -63,7 +73,7 @@ struct RootView: View {
 
     @Query(sort: \WeighIn.date, order: .forward) private var items: [WeighIn]
 
-    @State private var tab: Tab = .weigh
+    @Binding var tab: Tab
     @State private var sheet: ActiveSheet?
     @State private var showLive = false
     @State private var showOnboarding = false
@@ -174,13 +184,13 @@ struct RootView: View {
                          onOpenDay: { selectedDay = $0 })
             }
             .background(palette.bg)
-            .navigationTitle("Вес")
+            .navigationTitle(L("Weight"))
             // Дата последнего взвешивания — системным подзаголовком под крупным
             // заголовком (iOS 26), а не своей строкой рядом с ним.
             .modifier(NavigationSubtitle(text: lastWeighInLabel))
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button("Добавить вес вручную", systemImage: "plus") {
+                    Button(L("Add weight manually"), systemImage: "plus") {
                         showManualEntry = true
                     }
                 }
@@ -191,7 +201,7 @@ struct RootView: View {
     private var historyTab: some View {
         NavigationStack {
             HistoryView(items: items, onOpenDay: { selectedDay = $0 })
-                .navigationTitle("История")
+                .navigationTitle(L("History"))
         }
     }
 

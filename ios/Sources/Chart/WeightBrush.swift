@@ -48,9 +48,9 @@ struct WeightBrush: View {
         // У Canvas своей доступности нет вовсе, а щётка — главный орган
         // управления этого экрана.
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Окно графика")
+        .accessibilityLabel(L("Chart window"))
         .accessibilityValue(model.windowLabel)
-        .accessibilityHint("Потяните ручки, чтобы изменить период")
+        .accessibilityHint(L("Drag the handles to change the range"))
     }
 
     private func draw(_ ctx: inout GraphicsContext, size: CGSize) {

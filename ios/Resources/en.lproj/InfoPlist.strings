@@ -1,0 +1,6 @@
+/* Английские тексты системных запросов доступа. Язык берётся из настроек
+   телефона: переключатель внутри приложения на них не влияет. */
+"CFBundleDisplayName" = "QN Scale";
+"NSBluetoothAlwaysUsageDescription" = "The app connects to your bathroom scale over Bluetooth to read your weight.";
+"NSHealthUpdateUsageDescription" = "Weight and body composition are saved to Health so other apps can use the data.";
+"NSHealthShareUsageDescription" = "Access to Health is needed so already recorded measurements are not duplicated.";

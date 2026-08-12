@@ -79,7 +79,7 @@ struct Stats {
     }
 
     var goalDateLabel: String {
-        goalDate.map(Fmt.dayMonth) ?? "темп не задан"
+        goalDate.map(Fmt.dayMonth) ?? L("rate not set")
     }
 
     /// Прогноз веса через N дней.
@@ -147,7 +147,9 @@ struct Stats {
         guard let monday = cal.dateInterval(of: .weekOfYear, for: today)?.start else { return [] }
         return (0..<7).map { i -> DayBar in
             let date = cal.date(byAdding: .day, value: i, to: monday) ?? monday
-            let weekday = date.formatted(.dateTime.weekday(.abbreviated))
+            // Через Fmt — там локаль берётся из языка ПРИЛОЖЕНИЯ, а не телефона:
+            // иначе в английском интерфейсе столбики подписаны «ПН ВТ СР».
+            let weekday = Fmt.weekday(date)
             let future = date > today
             let isToday = cal.isDate(date, inSameDayAs: today)
             guard let idx = items.firstIndex(where: { cal.isDate($0.date, inSameDayAs: date) }) else {

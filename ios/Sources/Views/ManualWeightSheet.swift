@@ -24,14 +24,14 @@ struct ManualWeightSheet: View {
                 Section {
                     HStack(alignment: .lastTextBaseline, spacing: 7) {
                         Spacer(minLength: 0)
-                        TextField(lastWeight.map { Fmt.n($0) } ?? "0,00", text: $text)
+                        TextField(lastWeight.map { Fmt.n($0) } ?? L("0.00"), text: $text)
                             .font(.system(size: 56, weight: .semibold))
                             .monospacedDigit()
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                             .fixedSize()
                             .focused($focused)
-                        Text("кг")
+                        Text(L("kg"))
                             .font(.title3.weight(.medium))
                             .foregroundStyle(.secondary)
                         Spacer(minLength: 0)
@@ -41,18 +41,18 @@ struct ManualWeightSheet: View {
                 .listRowBackground(Color.clear)
 
                 Section {
-                    DatePicker("Когда", selection: $date, in: ...Date())
+                    DatePicker(L("When"), selection: $date, in: ...Date())
                 } footer: {
-                    Text("Импеданса у такой записи нет, поэтому процент жира для неё не считается.")
+                    Text(L("A manual entry has no impedance, so body fat is not calculated for it."))
                 }
             }
             .scrollDismissesKeyboard(.interactively)
-            .navigationTitle("Вес вручную")
+            .navigationTitle(L("Manual weight"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Отмена") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button(L("Cancel")) { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Сохранить") {
+                    Button(L("Save")) {
                         if let weight {
                             onSave(weight, date)
                             dismiss()
@@ -63,7 +63,7 @@ struct ManualWeightSheet: View {
                 // Цифровая клавиатура без «Готово» не убирается — кнопка обязана быть.
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
-                    Button("Готово") { focused = false }
+                    Button(L("Done")) { focused = false }
                 }
             }
         }

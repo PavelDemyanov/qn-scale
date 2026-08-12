@@ -67,11 +67,11 @@ private struct EmptyState: View {
 
     var body: some View {
         ContentUnavailableView {
-            Label("Первое взвешивание", systemImage: "scalemass")
+            Label(L("First weigh-in"), systemImage: "scalemass")
         } description: {
-            Text("Наступите на весы — приложение подключится само и запишет вес.")
+            Text(L("Step on the scale — the app connects on its own and records your weight."))
         } actions: {
-            Button("Добавить вес вручную", action: onManualAdd)
+            Button(L("Add weight manually"), action: onManualAdd)
                 .buttonStyle(.borderedProminent)
         }
     }
@@ -98,7 +98,7 @@ private struct LayoutNumbers: View {
                         .font(.system(size: 50, weight: .semibold))
                         .monospacedDigit()
                         .foregroundStyle(palette.fg)
-                    Text("кг")
+                    Text(L("kg"))
                         .font(.system(size: 19, weight: .medium))
                         .foregroundStyle(palette.fg2)
                 }
@@ -106,7 +106,7 @@ private struct LayoutNumbers: View {
                     if let day = stats.dayDelta {
                         HStack(spacing: 5) {
                             Text(Fmt.arrow(day))
-                            Text("\(Fmt.n(abs(day))) кг").monospacedDigit()
+                            Text(L("%@ kg", Fmt.n(abs(day)))).monospacedDigit()
                         }
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(palette.delta(day))
@@ -114,17 +114,17 @@ private struct LayoutNumbers: View {
                         .padding(.trailing, 11)
                         .padding(.vertical, 5)
                         .background(palette.deltaTint(day), in: Capsule())
-                        Text("за день")
+                        Text(L("since yesterday"))
                             .font(.system(size: 14))
                             .foregroundStyle(palette.fg2)
                     } else {
-                        Text("первое измерение")
+                        Text(L("first measurement"))
                             .font(.system(size: 14))
                             .foregroundStyle(palette.fg2)
                     }
                     Spacer()
                     if let fat = stats.last?.fatPercent(for: settings.profile) {
-                        Text("жир \(Fmt.n(fat, 1)) %")
+                        Text(L("body fat %@ %%", Fmt.n(fat, 1)))
                             .font(.system(size: 14))
                             .monospacedDigit()
                             .foregroundStyle(palette.fg2)
@@ -138,8 +138,8 @@ private struct LayoutNumbers: View {
             .cardInset()
 
             HStack(spacing: 11) {
-                DeltaTile(caption: "ЗА НЕДЕЛЮ", value: stats.weekDelta)
-                DeltaTile(caption: "ЗА МЕСЯЦ", value: stats.monthDelta)
+                DeltaTile(caption: L("PER WEEK"), value: stats.weekDelta)
+                DeltaTile(caption: L("PER MONTH"), value: stats.monthDelta)
             }
             .cardInset()
 
@@ -161,19 +161,19 @@ private struct LayoutNumbers: View {
     }
 
     private var goalSubtitle: String {
-        guard settings.showForecast else { return "осталось до цели" }
-        return stats.ratePerWeek.map { "\(Fmt.signed($0)) кг в неделю" } ?? "темп пока не посчитать"
+        guard settings.showForecast else { return L("left to goal") }
+        return stats.ratePerWeek.map { L("%@ kg per week", Fmt.signed($0)) } ?? L("rate not available yet")
     }
 
     private var forecastSection: some View {
         VStack(spacing: 0) {
-            SectionHeader(text: settings.showForecast ? "ПРОГНОЗ ПО ТЕКУЩЕМУ ТЕМПУ" : "ЦЕЛЬ", top: 2)
+            SectionHeader(text: settings.showForecast ? L("FORECAST AT THE CURRENT RATE") : L("GOAL"), top: 2)
             VStack(spacing: 0) {
                 ForEach(settings.showForecast
-                        ? [(7.0, "Через неделю"), (14.0, "Через 2 недели"), (30.0, "Через месяц")]
+                        ? [(7.0, L("In a week")), (14.0, L("In 2 weeks")), (30.0, L("In a month"))]
                         : [], id: \.0) { days, label in
                     Row(title: label, minHeight: 41) {
-                        Text(stats.forecast(days: days).map { "\(Fmt.n($0)) кг" } ?? "—")
+                        Text(stats.forecast(days: days).map { L("%@ kg", Fmt.n($0)) } ?? "—")
                             .font(.body.weight(.medium))
                             .monospacedDigit()
                             .foregroundStyle(palette.fg2)
@@ -181,14 +181,14 @@ private struct LayoutNumbers: View {
                     RowSeparator()
                 }
                 Button(action: onGoal) {
-                    Row(title: "Цель \(Fmt.n(settings.goalWeight, 1)) кг",
+                    Row(title: L("Goal %@ kg", Fmt.n(settings.goalWeight, 1)),
                         subtitle: goalSubtitle, minHeight: 52) {
                         // Дата достижения цели — главное в строке, и ужиматься
                         // она не должна: подпись про темп длинная, и без
                         // приоритета «2 октября» обрезалось до «…ября».
                         Text(settings.showForecast
                              ? stats.goalDateLabel
-                             : (stats.toGoal.map { "\(Fmt.n($0)) кг" } ?? "—"))
+                             : (stats.toGoal.map { L("%@ kg", Fmt.n($0)) } ?? "—"))
                             .font(.body.weight(.semibold))
                             .foregroundStyle(palette.green)
                             .lineLimit(1)
@@ -218,7 +218,7 @@ private struct SparkCard: View {
         Button(action: onTap) {
             VStack(spacing: 0) {
                 HStack {
-                    Text("Последние 30 дней")
+                    Text(L("Last 30 days"))
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(palette.fg)
                     Spacer()
@@ -231,7 +231,7 @@ private struct SparkCard: View {
                         }
                         .stroke(palette.green, style: StrokeStyle(lineWidth: 1.5, dash: [4, 4]))
                         .frame(width: 14, height: 1.5)
-                        Text("цель \(Fmt.n(settings.goalWeight, 1))")
+                        Text(L("goal %@", Fmt.n(settings.goalWeight, 1)))
                             .font(.system(size: 12))
                             .monospacedDigit()
                             .foregroundStyle(palette.fg2)
@@ -262,7 +262,7 @@ private struct SparkCard: View {
                 HStack {
                     Text(firstVisibleLabel)
                     Spacer()
-                    Text("сегодня")
+                    Text(L("today"))
                 }
                 .font(.system(size: 11))
                 .foregroundStyle(palette.fg3)
@@ -345,16 +345,16 @@ private struct LayoutChart: View {
                             .font(.system(size: 52, weight: .semibold))
                             .monospacedDigit()
                             .foregroundStyle(palette.fg)
-                        Text("кг")
+                        Text(L("kg"))
                             .font(.system(size: 17, weight: .medium))
                             .foregroundStyle(palette.fg2)
                     }
                     if let day = stats.dayDelta {
                         HStack(spacing: 6) {
-                            Text("\(Fmt.arrow(day)) \(Fmt.n(abs(day))) кг")
+                            Text(L("%@ %@ kg", Fmt.arrow(day), Fmt.n(abs(day))))
                                 .font(.system(size: 15, weight: .semibold))
                                 .foregroundStyle(palette.delta(day))
-                            Text("с прошлого раза")
+                            Text(L("since last time"))
                                 .font(.system(size: 15))
                                 .foregroundStyle(palette.fg3)
                         }
@@ -368,10 +368,10 @@ private struct LayoutChart: View {
                 // на короткой истории, и переключатель стоял бы вовсе без
                 // выделения. Записываем по-прежнему в `period`, чтобы выбор
                 // вернулся сам, когда история дорастёт.
-                Picker("Период", selection: Binding(get: { effectivePeriod },
+                Picker(L("Period"), selection: Binding(get: { effectivePeriod },
                                                     set: { period = $0 })) {
                     ForEach(heroPeriods) { p in
-                        Text(p == .d90 ? "3 месяца" : p.title).tag(p)
+                        Text(p == .d90 ? L("3 months") : p.title).tag(p)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -390,11 +390,11 @@ private struct LayoutChart: View {
 
     private var deltaRow: some View {
         HStack(spacing: 0) {
-            column("ДЕНЬ", stats.dayDelta)
+            column(L("DAY"), stats.dayDelta)
             verticalSeparator
-            column("НЕДЕЛЯ", stats.weekDelta)
+            column(L("WEEK"), stats.weekDelta)
             verticalSeparator
-            column("МЕСЯЦ", stats.monthDelta)
+            column(L("MONTH"), stats.monthDelta)
         }
         .card(radius: 20)
         .cardInset()
@@ -428,7 +428,7 @@ private struct LayoutChart: View {
         Button(action: onGoal) {
             HStack(spacing: 14) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("\(stats.goalDateLabel) — \(Fmt.n(settings.goalWeight, 1)) кг")
+                    Text(L("%@ — %@ kg", stats.goalDateLabel, Fmt.n(settings.goalWeight, 1)))
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(palette.fg)
                     Text(subtitle)
@@ -449,8 +449,8 @@ private struct LayoutChart: View {
     }
 
     private var subtitle: String {
-        let rate = stats.ratePerWeek.map { "темп \(Fmt.signed($0)) кг/нед" } ?? "темп пока не посчитать"
-        let left = stats.toGoal.map { " · осталось \(Fmt.n($0)) кг" } ?? ""
+        let rate = stats.ratePerWeek.map { L("rate %@ kg/week", Fmt.signed($0)) } ?? L("rate not available yet")
+        let left = stats.toGoal.map { " · " + L("%@ kg to goal", Fmt.n($0)) } ?? ""
         return rate + left
     }
 
@@ -466,7 +466,7 @@ private struct LayoutChart: View {
 
     private var recentList: some View {
         VStack(spacing: 0) {
-            SectionHeader(text: "ПО ДНЯМ", top: 4)
+            SectionHeader(text: L("BY DAY"), top: 4)
             VStack(spacing: 0) {
                 let recent = Array(items.suffix(5).reversed())
                 ForEach(recent) { item in
@@ -492,7 +492,9 @@ private struct LayoutChart: View {
             .card(radius: 20)
             .cardInset()
 
-            Text("\(items.count) взвешиваний · \(stats.daysWithScale) дней с весами · \(stats.streak) дней подряд")
+            Text(L("%@ · %@ with the scale · %@ in a row",
+                   Ln(items.count, "weigh-in"), Ln(stats.daysWithScale, "day"),
+                   Ln(stats.streak, "day")))
                 .font(.system(size: 12))
                 .foregroundStyle(palette.fg3)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -526,8 +528,8 @@ private struct LayoutGoal: View {
             if settings.showForecast { forecastCard }
 
             HStack(spacing: 11) {
-                DeltaTile(caption: "НЕДЕЛЯ", value: stats.weekDelta)
-                DeltaTile(caption: "МЕСЯЦ", value: stats.monthDelta)
+                DeltaTile(caption: L("WEEK"), value: stats.weekDelta)
+                DeltaTile(caption: L("MONTH"), value: stats.monthDelta)
                 fatTile
             }
             .cardInset()
@@ -537,7 +539,7 @@ private struct LayoutGoal: View {
 
     private var fatTile: some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text("ЖИР")
+            Text(L("BODY FAT"))
                 .font(.system(size: 12))
                 .foregroundStyle(palette.fg2)
             Text(stats.last?.fatPercent(for: settings.profile).map { Fmt.n($0, 1) } ?? "—")
@@ -573,18 +575,18 @@ private struct LayoutGoal: View {
                         .font(.system(size: 44, weight: .semibold))
                         .monospacedDigit()
                         .foregroundStyle(palette.fg)
-                    Text("кг")
+                    Text(L("kg"))
                         .font(.body.weight(.medium))
                         .foregroundStyle(palette.fg2)
                 }
                 if let day = stats.dayDelta {
-                    Text("\(Fmt.arrow(day)) \(Fmt.n(abs(day))) кг за день")
+                    Text(L("%@ %@ kg since yesterday", Fmt.arrow(day), Fmt.n(abs(day))))
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(palette.delta(day))
                         .padding(.top, 2)
                 }
                 if let toGoal = stats.toGoal {
-                    Text("до цели \(Fmt.n(toGoal)) кг")
+                    Text(L("%@ kg to goal", Fmt.n(toGoal)))
                         .font(.system(size: 12.5))
                         .foregroundStyle(palette.fg3)
                         .padding(.top, 6)
@@ -626,14 +628,14 @@ private struct LayoutGoal: View {
                     .foregroundStyle(palette.fg)
                     .lineSpacing(3)
                     .multilineTextAlignment(.leading)
-                Text(stats.ratePerWeek.map { "\(Fmt.signed($0)) кг в неделю по последним 30 дням" }
-                     ?? "Темп посчитается, когда наберётся несколько измерений")
+                Text(stats.ratePerWeek.map { L("%@ kg per week over the last 30 days", Fmt.signed($0)) }
+                     ?? L("The rate appears after a few measurements"))
                     .font(.system(size: 13))
                     .foregroundStyle(palette.fg2)
                     .padding(.top, 5)
 
                 HStack(spacing: 10) {
-                    ForEach([(7.0, "+1 нед"), (14.0, "+2 нед"), (30.0, "+1 мес")], id: \.0) { days, label in
+                    ForEach([(7.0, L("+1 wk")), (14.0, L("+2 wk")), (30.0, L("+1 mo"))], id: \.0) { days, label in
                         VStack(alignment: .leading, spacing: 3) {
                             Text(label)
                                 .font(.system(size: 11))
@@ -662,9 +664,9 @@ private struct LayoutGoal: View {
 
     private var headline: String {
         guard stats.goalDate != nil else {
-            return "Цель \(Fmt.n(settings.goalWeight, 1)) кг — темп пока не посчитать"
+            return L("Goal %@ kg — rate not available yet", Fmt.n(settings.goalWeight, 1))
         }
-        return "Если темп сохранится, \(Fmt.n(settings.goalWeight, 1)) кг будет \(stats.goalDateLabel)"
+        return L("If the rate holds, %@ kg on %@", Fmt.n(settings.goalWeight, 1), stats.goalDateLabel)
     }
 }
 
@@ -681,11 +683,11 @@ private struct WeekBarsCard: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("Эта неделя")
+                Text(L("This week"))
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(palette.fg)
                 Spacer()
-                Text("кг за день")
+                Text(L("kg per day"))
                     .font(.system(size: 12))
                     .foregroundStyle(palette.fg2)
             }

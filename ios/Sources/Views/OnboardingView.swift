@@ -17,7 +17,7 @@ struct OnboardingView: View {
         @Bindable var s = settings
 
         VStack(alignment: .leading, spacing: 0) {
-            Text("ШАГ \(step + 1) ИЗ 3")
+            Text(L("STEP %d OF 3", step + 1))
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(palette.blue)
                 .padding(.bottom, 14)
@@ -54,7 +54,7 @@ struct OnboardingView: View {
                 }
             }
 
-            Button("Пропустить") { finish() }
+            Button(L("Skip")) { finish() }
                 .font(.system(size: 15))
                 .foregroundStyle(palette.fg2)
                 .frame(maxWidth: .infinity)
@@ -89,36 +89,36 @@ struct OnboardingView: View {
 
     private var title: String {
         switch step {
-        case 0: return "Найдём ваши весы"
-        case 1: return "Пара цифр о вас"
-        default: return "Цель и напоминание"
+        case 0: return L("Let's find your scale")
+        case 1: return L("A few numbers about you")
+        default: return L("Goal and reminder")
         }
     }
 
     private var bodyText: String {
         switch step {
-        case 0: return "Наступите на весы и держитесь рядом с телефоном. Приложение запомнит их и в следующий раз подключится само."
-        case 1: return "Рост, дата рождения и пол нужны, чтобы посчитать процент жира по импедансу."
-        default: return "Цель появится линией на графике, а пуш придёт в выбранное время, если в этот день вы ещё не взвешивались."
+        case 0: return L("Step on the scale and stay near your phone. The app will remember it and connect on its own next time.")
+        case 1: return L("Height, date of birth and sex are needed to calculate body fat from impedance.")
+        default: return L("The goal shows up as a line on the chart, and a push arrives at the chosen time if you haven't weighed in that day.")
         }
     }
 
     private var buttonTitle: String {
         switch step {
-        case 0: return "Искать весы"
-        case 1: return "Дальше"
-        default: return "Начать"
+        case 0: return L("Search for scale")
+        case 1: return L("Next")
+        default: return L("Start")
         }
     }
 
     private var profileCard: some View {
         Button { editingProfile = true } label: {
             VStack(spacing: 0) {
-                onbRow("Рост", "\(Int(settings.profile.heightCm)) см")
+                onbRow(L("Height"), L("%d cm", Int(settings.profile.heightCm)))
                 RowSeparator()
-                onbRow("Дата рождения", settings.profile.birthDate.formatted(.dateTime.day().month().year()))
+                onbRow(L("Date of birth"), settings.profile.birthDate.formatted(.dateTime.day().month().year()))
                 RowSeparator()
-                onbRow("Пол", settings.profile.isMale ? "Мужской" : "Женский")
+                onbRow(L("Sex"), settings.profile.isMale ? L("Male") : L("Female"))
             }
             .card(radius: 20)
         }
@@ -128,29 +128,31 @@ struct OnboardingView: View {
     private var goalCard: some View {
         @Bindable var s = settings
         return VStack(spacing: 0) {
-            Row(title: "Желаемый вес", minHeight: 48) {
+            Row(title: L("Goal weight"), minHeight: 48) {
                 HStack(spacing: 12) {
-                    Text("\(Fmt.n(settings.goalWeight, 1)) кг")
+                    Text(L("%@ kg", Fmt.n(settings.goalWeight, 1)))
                         .monospacedDigit()
                         .lineLimit(1)
                         .fixedSize()
                         .foregroundStyle(palette.fg2)
                     // Системный шаговик вместо самодельных «−» и «+»:
                     // те же 0,5 кг, но с автоповтором и озвучкой VoiceOver.
-                    Stepper("Желаемый вес", value: $s.goalWeight, in: 40...200, step: 0.5)
+                    Stepper(L("Goal weight"), value: $s.goalWeight, in: 40...200, step: 0.5)
                         .labelsHidden()
                 }
             }
             RowSeparator()
-            Row(title: "Напоминание", minHeight: 48) {
+            Row(title: L("Reminder"), minHeight: 48) {
                 Toggle("", isOn: $s.remindersEnabled)
                     .labelsHidden()
+                    .accessibilityLabel(L("Reminder"))
                     .tint(palette.green)
             }
             RowSeparator()
-            Row(title: "Записывать в «Здоровье»", minHeight: 48) {
+            Row(title: L("Save to Health"), minHeight: 48) {
                 Toggle("", isOn: $s.healthEnabled)
                     .labelsHidden()
+                    .accessibilityLabel(L("Save to Health"))
                     .tint(palette.green)
             }
         }

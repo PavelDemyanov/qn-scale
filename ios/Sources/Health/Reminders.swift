@@ -26,8 +26,8 @@ enum Reminders {
         let weighedToday = lastWeighIn.map { cal.isDateInToday($0) } ?? false
 
         let content = UNMutableNotificationContent()
-        content.title = "Пора взвеситься"
-        content.body = "Утреннее взвешивание — самое показательное: до еды и воды."
+        content.title = L("Time to weigh in")
+        content.body = L("A morning weigh-in is the most telling one: before food and water.")
         content.sound = .default
 
         for offset in 0..<horizon {

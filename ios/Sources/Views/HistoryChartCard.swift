@@ -77,7 +77,7 @@ struct HistoryChartCard: View {
     private var header: some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 1) {
-                Text("диапазон · \(model.visibleDays) дн.")
+                Text(L("range · %d d", model.visibleDays))
                     .font(.system(size: 12))
                     .foregroundStyle(palette.fg2)
                 HStack(alignment: .lastTextBaseline, spacing: 5) {
@@ -87,13 +87,13 @@ struct HistoryChartCard: View {
                         .font(.system(size: 24, weight: .semibold))
                         .monospacedDigit()
                         .foregroundStyle(palette.fg)
-                    Text("кг")
+                    Text(L("kg"))
                         .font(.system(size: 13))
                         .foregroundStyle(palette.fg2)
                 }
             }
             Spacer()
-            Text("задержите палец — метка\nщипок — масштаб")
+            Text(L("press and hold — marker\npinch — zoom"))
                 .font(.system(size: 10))
                 .multilineTextAlignment(.trailing)
                 .foregroundStyle(palette.fg3)
@@ -130,11 +130,11 @@ struct HistoryChartCard: View {
             Text(Fmt.dayLabel(s.date) + ", " + Fmt.time(s.date))
                 .font(.system(size: 11))
                 .foregroundStyle(palette.fg2)
-            Text("\(Fmt.n(s.kg)) кг")
+            Text(L("%@ kg", Fmt.n(s.kg)))
                 .font(.body.weight(.semibold))
                 .monospacedDigit()
                 .foregroundStyle(palette.fg)
-            Text(d.map { "\(Fmt.signed($0)) кг" } ?? "первое")
+            Text(d.map { L("%@ kg", Fmt.signed($0)) } ?? L("first"))
                 .font(.system(size: 11, weight: .semibold))
                 .monospacedDigit()
                 .foregroundStyle(d.map { palette.delta($0) } ?? palette.fg3)

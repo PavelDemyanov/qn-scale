@@ -22,23 +22,23 @@ final class ScaleManager: NSObject {
         /// Подписи из макета: четыре фазы взвешивания.
         var caption: String {
             switch self {
-            case .bluetoothOff: return "Bluetooth выключен"
-            case .unauthorized: return "Нет доступа к Bluetooth"
-            case .searching:    return "Встаньте на весы"
-            case .connecting, .negotiating: return "Соединяюсь…"
-            case .measuring:    return "Считываю вес…"
-            case .finished:     return "Готово"
+            case .bluetoothOff: return L("Bluetooth is off")
+            case .unauthorized: return L("No Bluetooth access")
+            case .searching:    return L("Step on the scale")
+            case .connecting, .negotiating: return L("Connecting…")
+            case .measuring:    return L("Reading weight…")
+            case .finished:     return L("Done")
             }
         }
 
         var hint: String {
             switch self {
-            case .bluetoothOff: return "Включите Bluetooth в пункте управления"
-            case .unauthorized: return "Разрешите доступ к Bluetooth в настройках iOS"
-            case .searching:    return "Весы просыпаются, когда на них наступают"
-            case .connecting, .negotiating: return "Здороваюсь с весами по протоколу QN"
-            case .measuring:    return "Не сходите, пока цифра не зафиксируется"
-            case .finished:     return "Измерение сохранено в истории"
+            case .bluetoothOff: return L("Turn on Bluetooth in Control Center")
+            case .unauthorized: return L("Allow Bluetooth access in iOS Settings")
+            case .searching:    return L("The scale wakes up when you step on it")
+            case .connecting, .negotiating: return L("Handshaking with the scale over the QN protocol")
+            case .measuring:    return L("Do not step off until the number settles")
+            case .finished:     return L("Measurement saved to History")
             }
         }
 

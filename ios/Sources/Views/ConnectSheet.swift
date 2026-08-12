@@ -63,10 +63,10 @@ struct ConnectSheet: View {
         .background(palette.sheet)
         // Отступ 34 у кнопки — от края экрана, как в макете
         .ignoresSafeArea(edges: .bottom)
-        .navigationTitle("Поиск весов")
+        .navigationTitle(L("Find scale"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) { Button("Отмена") { dismiss() } }
+            ToolbarItem(placement: .cancellationAction) { Button(L("Cancel")) { dismiss() } }
         }
         }
         .onAppear {
@@ -103,28 +103,28 @@ struct ConnectSheet: View {
 
     private var title: String {
         switch step {
-        case .searching: return "Ищу весы…"
-        case .found: return "Найдены весы"
-        case .handshake: return "Подключаюсь"
-        case .done: return "Весы запомнены"
+        case .searching: return L("Searching for scale…")
+        case .found: return L("Scale found")
+        case .handshake: return L("Connecting")
+        case .done: return L("Scale saved")
         }
     }
 
     private var subtitle: String {
         switch step {
-        case .searching: return "Наступите на весы, чтобы они проснулись — в спящем режиме их не видно в эфире."
-        case .found: return "Это те самые, если на дисплее сейчас горят нули."
-        case .handshake: return "Настраиваю единицы и синхронизирую время — без этого весы не начнут передавать вес."
-        case .done: return "Приложение будет подключаться к ним само, как только вы встанете."
+        case .searching: return L("Step on the scale to wake it up — while it's asleep it stays invisible over Bluetooth.")
+        case .found: return L("This is the one if zeros are lit on its display right now.")
+        case .handshake: return L("Setting the units and syncing the time — without this the scale won't start sending weight.")
+        case .done: return L("The app will connect to it on its own as soon as you step on it.")
         }
     }
 
     private var buttonTitle: String {
         switch step {
-        case .searching: return "Ищу…"
-        case .found: return "Подключить"
-        case .handshake: return "Подключаюсь…"
-        case .done: return "Готово"
+        case .searching: return L("Searching…")
+        case .found: return L("Connect")
+        case .handshake: return L("Connecting…")
+        case .done: return L("Done")
         }
     }
 
@@ -136,7 +136,7 @@ struct ConnectSheet: View {
                        scale.candidateRSSI.map { "\($0) dBm" }]
                 .compactMap { $0 }.joined(separator: " · "),
             minHeight: 58) {
-            Button("Выбрать") { scale.confirmPairing() }
+            Button(L("Select")) { scale.confirmPairing() }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
         }
@@ -146,13 +146,13 @@ struct ConnectSheet: View {
 
     private var stepsCard: some View {
         VStack(spacing: 0) {
-            stepRow("Сервис FFF0 найден", "0x12", scale.handshake.serviceFound)
+            stepRow(L("FFF0 service found"), "0x12", scale.handshake.serviceFound)
             RowSeparator()
-            stepRow("Единицы — килограммы", "0x13", scale.handshake.unitsConfigured)
+            stepRow(L("Units — kilograms"), "0x13", scale.handshake.unitsConfigured)
             RowSeparator()
-            stepRow("Синхронизация времени", "0x20", scale.handshake.timeSynced)
+            stepRow(L("Time sync"), "0x20", scale.handshake.timeSynced)
             RowSeparator()
-            stepRow("Поток измерений", "0x10", scale.handshake.streaming)
+            stepRow(L("Measurement stream"), "0x10", scale.handshake.streaming)
         }
         .sheetCard(radius: 20)
         .cardInset()

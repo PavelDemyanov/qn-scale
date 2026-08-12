@@ -42,7 +42,7 @@ struct HistoryView: View {
                         // Переключатель — ОТДЕЛЬНОЙ строкой, а не внутри карточки:
                         // внутри он рисовался, но в область нажатия строки не
                         // попадал и молча не работал, пока список не прокрутят.
-                        Picker("Период", selection: periodBinding) {
+                        Picker(L("Period"), selection: periodBinding) {
                             // Только те пресеты, что на этой истории означают
                             // разное: на трёхдневной «30 дней» и «Всё» — одно
                             // и то же окно.
@@ -82,22 +82,22 @@ struct HistoryView: View {
     }
 
     private var emptyState: some View {
-        ContentUnavailableView("Пока пусто",
+        ContentUnavailableView(L("Nothing here yet"),
                                systemImage: "chart.xyaxis.line",
-                               description: Text("Встаньте на весы — первое измерение появится здесь."))
+                               description: Text(L("Step on the scale — your first measurement will show up here.")))
     }
 
     private var summarySection: some View {
         let d = model.digest
-        return Section("Итог за период") {
-            LabeledContent("Изменение") {
+        return Section(L("Period summary")) {
+            LabeledContent(L("Change")) {
                 // Прочерк, а не «0,00 кг»: в окне без измерений менятьcя нечему.
-                Text(d.change.map { "\(Fmt.signed($0)) кг" } ?? "—")
+                Text(d.change.map { L("%@ kg", Fmt.signed($0)) } ?? "—")
                     .foregroundStyle(d.change.map { palette.delta($0) } ?? Color.secondary)
             }
-            LabeledContent("Минимум", value: d.lo.map { "\(Fmt.n($0)) кг" } ?? "—")
-            LabeledContent("Максимум", value: d.hi.map { "\(Fmt.n($0)) кг" } ?? "—")
-            LabeledContent("Взвешиваний", value: "\(d.count)")
+            LabeledContent(L("Minimum"), value: d.lo.map { L("%@ kg", Fmt.n($0)) } ?? "—")
+            LabeledContent(L("Maximum"), value: d.hi.map { L("%@ kg", Fmt.n($0)) } ?? "—")
+            LabeledContent(L("Weigh-ins"), value: "\(d.count)")
         }
     }
 
@@ -108,11 +108,11 @@ struct HistoryView: View {
                     .buttonStyle(.plain)
             }
         } header: {
-            Text("Измерения")
+            Text(L("Measurements"))
         } footer: {
             Text(model.digest.count > 18
-                 ? "Показаны последние 18 из \(model.digest.count) за период"
-                 : "\(model.digest.count) измерений за период")
+                 ? L("Showing the last 18 of %d for the period", model.digest.count)
+                 : L("%@ for the period", Ln(model.digest.count, "measurement")))
         }
     }
 
@@ -123,7 +123,7 @@ struct HistoryView: View {
         return HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 1) {
                 Text(Fmt.dayLabel(p.date))
-                Text(p.fat.map { "\(Fmt.time(p.date)) · жир \(Fmt.n($0, 1)) %" } ?? Fmt.time(p.date))
+                Text(p.fat.map { L("%@ · body fat %@ %%", Fmt.time(p.date), Fmt.n($0, 1)) } ?? Fmt.time(p.date))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

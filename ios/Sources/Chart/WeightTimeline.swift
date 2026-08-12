@@ -14,10 +14,10 @@ enum WeightPeriod: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .d7: return "7 дней"
-        case .d30: return "30 дней"
-        case .d90: return "90 дней"
-        case .all: return "Всё"
+        case .d7: return L("7 days")
+        case .d30: return L("30 days")
+        case .d90: return L("90 days")
+        case .all: return L("All")
         }
     }
 

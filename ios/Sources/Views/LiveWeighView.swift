@@ -36,7 +36,7 @@ struct LiveWeighView: View {
                     .monospacedDigit()
                     .foregroundStyle(isDone ? palette.fg : palette.fg2)
                     .contentTransition(.numericText())
-                Text("кг")
+                Text(L("kg"))
                     .font(.system(size: 20, weight: .medium))
                     .foregroundStyle(palette.fg2)
             }
@@ -50,7 +50,7 @@ struct LiveWeighView: View {
 
             Spacer()
 
-            ActionButton(title: isDone ? "Готово" : "Отменить",
+            ActionButton(title: isDone ? L("Done") : L("Cancel"),
                          kind: isDone ? .primary : .secondary,
                          action: onClose)
         }
@@ -96,22 +96,22 @@ struct LiveWeighView: View {
 
         return VStack(spacing: 0) {
             VStack(spacing: 0) {
-                Row(title: "С прошлого раза", minHeight: 48) {
-                    Text(delta.map { "\(Fmt.signed($0)) кг" } ?? "первое измерение")
+                Row(title: L("Since last time"), minHeight: 48) {
+                    Text(delta.map { L("%@ kg", Fmt.signed($0)) } ?? L("first measurement"))
                         .font(.body.weight(.semibold))
                         .monospacedDigit()
                         .foregroundStyle(delta.map { palette.delta($0) } ?? palette.fg2)
                 }
                 RowSeparator()
-                Row(title: "Жир", minHeight: 48) {
+                Row(title: L("Body fat"), minHeight: 48) {
                     Text(fat.map { "\(Fmt.n($0, 1)) %" } ?? "—")
                         .font(.body.weight(.medium))
                         .monospacedDigit()
                         .foregroundStyle(palette.fg2)
                 }
                 RowSeparator()
-                Row(title: "Импеданс", minHeight: 48) {
-                    Text("\(reading.impedance1) / \(reading.impedance2) Ом")
+                Row(title: L("Impedance"), minHeight: 48) {
+                    Text(L("%d / %d Ω", reading.impedance1, reading.impedance2))
                         .font(.body.weight(.medium))
                         .monospacedDigit()
                         .foregroundStyle(palette.fg2)
@@ -119,7 +119,7 @@ struct LiveWeighView: View {
             }
             .card()
 
-            Text(settings.healthEnabled ? "Записано в «Здоровье»" : "«Здоровье» выключено в настройках")
+            Text(settings.healthEnabled ? L("Saved to Health") : L("Health is off in Settings"))
                 .font(.system(size: 13))
                 .foregroundStyle(palette.fg3)
                 .padding(.top, 12)

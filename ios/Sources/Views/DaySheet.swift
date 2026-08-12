@@ -18,11 +18,11 @@ struct DaySheet: View {
                         Text(Fmt.n(item.weightKg))
                             .font(.system(size: 44, weight: .semibold))
                             .monospacedDigit()
-                        Text("кг")
+                        Text(L("kg"))
                             .font(.headline)
                             .foregroundStyle(.secondary)
                         Spacer()
-                        Text(delta.map { "\(Fmt.signed($0)) кг" } ?? "первое")
+                        Text(delta.map { L("%@ kg", Fmt.signed($0)) } ?? L("first"))
                             .font(.headline)
                             .monospacedDigit()
                             .foregroundStyle(delta.map { palette.delta($0) } ?? .secondary)
@@ -31,17 +31,17 @@ struct DaySheet: View {
                 }
 
                 Section {
-                    LabeledContent("Время", value: Fmt.time(item.date))
-                    LabeledContent("Жир",
+                    LabeledContent(L("Time"), value: Fmt.time(item.date))
+                    LabeledContent(L("Body fat"),
                                    value: item.fatPercent(for: settings.profile)
                                        .map { "\(Fmt.n($0, 1)) %" } ?? "—")
-                    LabeledContent("Импеданс",
-                                   value: item.impedance1 > 0 ? "\(item.impedance1) Ом" : "нет данных")
-                    LabeledContent("В «Здоровье»", value: item.syncedToHealth ? "записано" : "нет")
+                    LabeledContent(L("Impedance"),
+                                   value: item.impedance1 > 0 ? L("%d Ω", item.impedance1) : L("no data"))
+                    LabeledContent(L("In Health"), value: item.syncedToHealth ? L("saved") : L("not saved"))
                 }
 
                 Section {
-                    Button("Удалить измерение", role: .destructive) {
+                    Button(L("Delete measurement"), role: .destructive) {
                         onDelete()
                         dismiss()
                     }
@@ -50,7 +50,7 @@ struct DaySheet: View {
             .navigationTitle(Fmt.fullDate(item.date))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) { Button("Готово") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) { Button(L("Done")) { dismiss() } }
             }
         }
     }

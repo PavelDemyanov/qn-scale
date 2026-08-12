@@ -2,7 +2,7 @@ import SwiftUI
 
 enum AppTheme: String, CaseIterable {
     case dark, light
-    var title: String { self == .dark ? "Тёмная" : "Светлая" }
+    var title: String { self == .dark ? L("Dark") : L("Light") }
     var palette: Palette { self == .dark ? .dark : .light }
     var colorScheme: ColorScheme { self == .dark ? .dark : .light }
 }
@@ -12,9 +12,9 @@ enum MainLayout: String, CaseIterable {
     case numbers = "a", chart = "b", goal = "c"
     var title: String {
         switch self {
-        case .numbers: return "Числа"
-        case .chart: return "График"
-        case .goal: return "Цель"
+        case .numbers: return L("Numbers")
+        case .chart: return L("Chart")
+        case .goal: return L("Goal")
         }
     }
 }
@@ -38,6 +38,14 @@ final class AppSettings {
     var showGoalLine: Bool { didSet { d.set(showGoalLine, forKey: "showGoalLine") } }
     /// Серый пунктир прогноза и разделы с предсказанным весом.
     var showForecast: Bool { didSet { d.set(showForecast, forKey: "showForecast") } }
+    /// Язык интерфейса. Держится ЗДЕСЬ, а не в системных настройках телефона:
+    /// переключение внутри приложения меняет язык сразу, без перезапуска.
+    var language: AppLanguage {
+        didSet {
+            d.set(language.rawValue, forKey: "language")
+            L10n.current = language
+        }
+    }
 
     static let reminderTimes = ["6:30", "7:00", "7:30", "8:00", "8:30", "9:00", "9:30", "10:00"]
 
@@ -58,6 +66,9 @@ final class AppSettings {
         // По умолчанию обе линии включены — но только если пользователь их ещё не трогал.
         showGoalLine = d.object(forKey: "showGoalLine") as? Bool ?? true
         showForecast = d.object(forKey: "showForecast") as? Bool ?? true
+        // Первый запуск — берём язык телефона.
+        language = AppLanguage(rawValue: d.string(forKey: "language") ?? "") ?? .system
+        L10n.current = language
     }
 
     var palette: Palette { theme.palette }

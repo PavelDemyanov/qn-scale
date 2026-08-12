@@ -58,10 +58,10 @@ struct HealthImportSheet: View {
         .background(palette.sheet)
         // Отступ 34 у кнопки — от края экрана, как в макете
         .ignoresSafeArea(edges: .bottom)
-        .navigationTitle("«Здоровье»")
+        .navigationTitle(L("Health"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) { Button("Отмена") { dismiss() } }
+            ToolbarItem(placement: .cancellationAction) { Button(L("Cancel")) { dismiss() } }
         }
         }
         .task { await loadPreview() }
@@ -69,38 +69,38 @@ struct HealthImportSheet: View {
 
     private var title: String {
         switch stage {
-        case .preparing: return "Читаю «Здоровье»…"
-        case .options: return "Найдено \(preview.found) записей о весе"
-        case .running: return "Импортирую"
-        case .done: return "Импортировано \(importedCount) измерений"
+        case .preparing: return L("Reading Health…")
+        case .options: return L("Found %@ of weight", Ln(preview.found, "record"))
+        case .running: return L("Importing")
+        case .done: return L("Imported %@", Ln(importedCount, "measurement"))
         }
     }
 
     private var subtitle: String {
         switch stage {
         case .preparing:
-            return "Смотрю, какие записи о весе там есть."
+            return L("Checking what weight records are there.")
         case .options:
             guard preview.found > 0 else {
-                return "В «Здоровье» нет записей о весе от других приложений."
+                return L("There are no weight records from other apps in Health.")
             }
-            let earliest = preview.earliest.map { "Самая ранняя — \(Fmt.dayMonth($0)) \(Calendar.current.component(.year, from: $0)). " } ?? ""
-            return earliest + "Импеданса в «Здоровье» нет, поэтому процент жира у этих записей будет пустым."
+            let earliest = preview.earliest.map { L("The earliest is %@, %d.", Fmt.dayMonth($0), Calendar.current.component(.year, from: $0)) + " " } ?? ""
+            return earliest + L("Health has no impedance, so body fat will be empty for these records.")
         case .running:
-            return "Читаю записи и считаю дельты по дням…"
+            return L("Reading records and computing daily deltas…")
         case .done:
             return skippedCount > 0
-                ? "\(skippedCount) записей пропущены как дубликаты уже сохранённых измерений."
-                : "Дубликатов не нашлось."
+                ? L("%@ skipped as duplicates of measurements already saved.", Ln(skippedCount, "record"))
+                : L("No duplicates found.")
         }
     }
 
     private var buttonTitle: String {
         switch stage {
-        case .preparing: return "Читаю…"
-        case .options: return preview.found > 0 ? "Импортировать" : "Закрыть"
-        case .running: return "Импортирую…"
-        case .done: return "Готово"
+        case .preparing: return L("Reading…")
+        case .options: return preview.found > 0 ? L("Import") : L("Close")
+        case .running: return L("Importing…")
+        case .done: return L("Done")
         }
     }
 
@@ -108,8 +108,8 @@ struct HealthImportSheet: View {
 
     private var optionsCard: some View {
         List {
-            Toggle("Пропускать дубликаты", isOn: $skipDuplicates)
-            LabeledContent("Период", value: "вся история")
+            Toggle(L("Skip duplicates"), isOn: $skipDuplicates)
+            LabeledContent(L("Period"), value: L("all history"))
         }
         .scrollDisabled(true)
         .frame(height: 140)
@@ -117,7 +117,7 @@ struct HealthImportSheet: View {
 
     private var progressBar: some View {
         ProgressView(value: progress) {
-            Text("Импортирую")
+            Text(L("Importing"))
         } currentValueLabel: {
             Text(progress.formatted(.percent.precision(.fractionLength(0))))
         }

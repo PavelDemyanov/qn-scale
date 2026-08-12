@@ -28,11 +28,11 @@ struct SettingsView: View {
             appearanceSection
 
             Section {
-                Button("Пройти настройку заново", action: onRestartOnboarding)
-                LabeledContent("Версия", value: "1.0 (1)")
+                Button(L("Run setup again"), action: onRestartOnboarding)
+                LabeledContent(L("Version"), value: "1.0 (1)")
             }
         }
-        .navigationTitle("Настройки")
+        .navigationTitle(L("Settings"))
     }
 
     // MARK: - Весы
@@ -48,38 +48,38 @@ struct SettingsView: View {
                     Text(stateLabel)
                 }
             } label: {
-                Text(settings.knownScaleID == nil ? "Весы не выбраны" : "Libra CS20C1")
+                Text(settings.knownScaleID == nil ? L("No scale selected") : "Libra CS20C1")
                 Text(subtitle)
             }
 
-            Button("Искать весы", action: onSearchScale)
+            Button(L("Search for scale"), action: onSearchScale)
 
             if settings.knownScaleID != nil {
-                Button("Забыть эти весы", role: .destructive) {
+                Button(L("Forget this scale"), role: .destructive) {
                     scale.forget()
                     settings.knownScaleID = nil
                     settings.knownScaleMAC = nil
                 }
             }
         } header: {
-            Text("Весы")
+            Text(L("Scale"))
         } footer: {
-            Text("Весы просыпаются, когда на них наступают, и засыпают через несколько секунд.")
+            Text(L("The scale wakes up when you step on it and falls asleep a few seconds later."))
         }
     }
 
     private var subtitle: String {
         if let mac = settings.knownScaleMAC ?? scale.scaleMAC { return "QN-Scale · \(mac)" }
-        return settings.knownScaleID == nil ? "Нажмите «Искать весы»" : "QN-Scale"
+        return settings.knownScaleID == nil ? L("Tap “Search for scale”") : "QN-Scale"
     }
 
     private var stateLabel: String {
         switch scale.state {
-        case .measuring, .finished: return "подключены"
-        case .connecting, .negotiating: return "соединяюсь"
-        case .bluetoothOff: return "bluetooth выкл."
-        case .unauthorized: return "нет доступа"
-        case .searching: return settings.knownScaleID == nil ? "не выбраны" : "ожидание"
+        case .measuring, .finished: return L("connected")
+        case .connecting, .negotiating: return L("connecting")
+        case .bluetoothOff: return L("Bluetooth off")
+        case .unauthorized: return L("no access")
+        case .searching: return settings.knownScaleID == nil ? L("not selected") : L("waiting")
         }
     }
 
@@ -89,12 +89,12 @@ struct SettingsView: View {
         @Bindable var s = settings
         return Section {
             Stepper(value: $s.goalWeight, in: 40...200, step: 0.5) {
-                LabeledContent("Желаемый вес",
+                LabeledContent(L("Goal weight"),
                                value: settings.goalWeight,
                                format: .number.precision(.fractionLength(1)))
             }
         } header: {
-            Text("Цель")
+            Text(L("Goal"))
         } footer: {
             Text(goalFooter)
         }
@@ -102,9 +102,9 @@ struct SettingsView: View {
 
     private var goalFooter: String {
         guard settings.showForecast, stats.goalDate != nil else {
-            return "Линия цели появится на графике."
+            return L("The goal line will appear on the chart.")
         }
-        return "Линия цели появится на графике; от неё считается прогноз — сейчас это \(stats.goalDateLabel)."
+        return L("The goal line will appear on the chart; the forecast is counted from it — right now that is %@.", stats.goalDateLabel)
     }
 
     // MARK: - График
@@ -112,12 +112,12 @@ struct SettingsView: View {
     private var chartSection: some View {
         @Bindable var s = settings
         return Section {
-            Toggle("Линия цели", isOn: $s.showGoalLine)
-            Toggle("Прогноз веса", isOn: $s.showForecast)
+            Toggle(L("Goal line"), isOn: $s.showGoalLine)
+            Toggle(L("Weight forecast"), isOn: $s.showForecast)
         } header: {
-            Text("График")
+            Text(L("Chart"))
         } footer: {
-            Text("Зелёный пунктир — цель, серый — прогноз по текущему темпу. Выключенные линии пропадают на всех графиках, а вместе с прогнозом — и предсказанные цифры.")
+            Text(L("The green dashed line is the goal, the grey one is the forecast at the current rate. Lines you turn off disappear from every chart, and turning off the forecast also hides the predicted numbers."))
         }
     }
 
@@ -126,17 +126,17 @@ struct SettingsView: View {
     private var healthSection: some View {
         @Bindable var s = settings
         return Section {
-            Toggle("Записывать в «Здоровье»", isOn: $s.healthEnabled)
+            Toggle(L("Save to Health"), isOn: $s.healthEnabled)
                 .disabled(!health.isAvailable)
             Button(action: onImportHealth) {
-                LabeledContent("Загрузить историю из «Здоровья»",
+                LabeledContent(L("Import history from Health"),
                                value: settings.importedFromHealth > 0
-                                      ? "\(settings.importedFromHealth) записей" : "")
+                                      ? Ln(settings.importedFromHealth, "record") : "")
             }
         } header: {
-            Text("Здоровье")
+            Text(L("Health"))
         } footer: {
-            Text("Вес, процент жира и ИМТ попадут в «Здоровье» — их подхватят другие приложения.")
+            Text(L("Weight, body fat and BMI go to Health — other apps will pick them up."))
         }
         .onChange(of: settings.healthEnabled) { _, on in
             if on { Task { _ = await health.requestAuthorization() } }
@@ -148,13 +148,13 @@ struct SettingsView: View {
     private var remindersSection: some View {
         @Bindable var s = settings
         return Section {
-            Toggle("Напоминать взвешиваться", isOn: $s.remindersEnabled)
-            DatePicker("Время", selection: reminderDate, displayedComponents: .hourAndMinute)
+            Toggle(L("Remind me to weigh in"), isOn: $s.remindersEnabled)
+            DatePicker(L("Time"), selection: reminderDate, displayedComponents: .hourAndMinute)
                 .disabled(!settings.remindersEnabled)
         } header: {
-            Text("Напоминания")
+            Text(L("Reminders"))
         } footer: {
-            Text("Пуш придёт только если в этот день ещё не было измерения.")
+            Text(L("The reminder only arrives if you haven't weighed in that day."))
         }
         .onChange(of: settings.remindersEnabled) { _, _ in rescheduleReminders() }
         .onChange(of: settings.reminderTime) { _, _ in rescheduleReminders() }
@@ -188,16 +188,16 @@ struct SettingsView: View {
             NavigationLink {
                 ProfileEditorView()
             } label: {
-                LabeledContent("Профиль", value: profileSummary)
+                LabeledContent(L("Profile"), value: profileSummary)
             }
         } footer: {
-            Text("Рост, возраст и пол нужны для расчёта процента жира по импедансу.")
+            Text(L("Height, age and sex are needed to calculate body fat from impedance."))
         }
     }
 
     private var profileSummary: String {
         let p = settings.profile
-        return "\(Int(p.heightCm)) см · \(p.age) лет · \(p.isMale ? "муж." : "жен.")"
+        return L("%d cm · %@ · %@", Int(p.heightCm), Ln(p.age, "year"), p.isMale ? L("male") : L("female"))
     }
 
     // MARK: - Вид
@@ -205,19 +205,27 @@ struct SettingsView: View {
     private var appearanceSection: some View {
         @Bindable var s = settings
         return Section {
-            Picker("Тема", selection: $s.theme) {
+            // Язык переключается ЗДЕСЬ, а не в системных настройках телефона:
+            // меняется сразу, без перезапуска. Названия языков — всегда на
+            // самом языке, чтобы их находили, не зная текущего.
+            Picker(L("Language"), selection: $s.language) {
+                ForEach(AppLanguage.allCases) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.segmented)
+
+            Picker(L("Theme"), selection: $s.theme) {
                 ForEach(AppTheme.allCases, id: \.self) { Text($0.title).tag($0) }
             }
             .pickerStyle(.segmented)
 
-            Picker("Главный экран", selection: $s.mainLayout) {
+            Picker(L("Main screen"), selection: $s.mainLayout) {
                 ForEach(MainLayout.allCases, id: \.self) { Text($0.title).tag($0) }
             }
             .pickerStyle(.segmented)
         } header: {
-            Text("Вид")
+            Text(L("Appearance"))
         } footer: {
-            Text("Три компоновки главного экрана на выбор — сравните их вживую.")
+            Text(L("Three main-screen layouts to choose from — compare them live."))
         }
     }
 }
@@ -233,50 +241,50 @@ struct ProfileEditorView: View {
         @Bindable var s = settings
         Form {
             Section {
-                LabeledContent("Рост") {
+                LabeledContent(L("Height")) {
                     HStack {
-                        TextField("см", value: $s.profile.heightCm, format: .number)
+                        TextField(L("cm"), value: $s.profile.heightCm, format: .number)
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                             .focused($focus, equals: .height)
-                        Text("см").foregroundStyle(.secondary)
+                        Text(L("cm")).foregroundStyle(.secondary)
                     }
                 }
-                DatePicker("Дата рождения", selection: $s.profile.birthDate,
+                DatePicker(L("Date of birth"), selection: $s.profile.birthDate,
                            in: ...Date(), displayedComponents: .date)
-                Picker("Пол", selection: $s.profile.isMale) {
-                    Text("Мужской").tag(true)
-                    Text("Женский").tag(false)
+                Picker(L("Sex"), selection: $s.profile.isMale) {
+                    Text(L("Male")).tag(true)
+                    Text(L("Female")).tag(false)
                 }
             } header: {
-                Text("Тело")
+                Text(L("Body"))
             } footer: {
-                Text("Рост, возраст и пол нужны для расчёта процента жира по импедансу.")
+                Text(L("Height, age and sex are needed to calculate body fat from impedance."))
             }
 
             Section {
-                LabeledContent("Поправка жира") {
+                LabeledContent(L("Body fat offset")) {
                     HStack {
                         TextField("0", value: $s.profile.fatCalibration, format: .number)
                             .keyboardType(.numbersAndPunctuation)
                             .multilineTextAlignment(.trailing)
                             .focused($focus, equals: .calibration)
-                        Text("п.п.").foregroundStyle(.secondary)
+                        Text(L("pp")).foregroundStyle(.secondary)
                     }
                 }
             } header: {
-                Text("Калибровка")
+                Text(L("Calibration"))
             } footer: {
-                Text("Процент жира — оценка по импедансу, а не измерение. Если есть чему доверять больше (DXA, InBody) — сдвиньте расчёт на нужное число процентных пунктов.")
+                Text(L("Body fat is an estimate from impedance, not a measurement. If you have something you trust more (DXA, InBody), shift the calculation by the needed number of percentage points."))
             }
         }
-        .navigationTitle("Профиль")
+        .navigationTitle(L("Profile"))
         .navigationBarTitleDisplayMode(.inline)
         .scrollDismissesKeyboard(.immediately)
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
-                Button("Готово") { focus = nil }.fontWeight(.semibold)
+                Button(L("Done")) { focus = nil }.fontWeight(.semibold)
             }
         }
     }
