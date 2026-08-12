@@ -69,7 +69,7 @@ struct HistoryView: View {
             }
         }
         .padding(.top, 58)
-        .padding(.bottom, TabBar.reservedHeight + 24)
+        .padding(.bottom, 24)
     }
 
     private var emptyState: some View {

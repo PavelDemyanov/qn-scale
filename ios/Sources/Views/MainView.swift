@@ -26,7 +26,7 @@ struct MainView: View {
                 }
             }
         }
-        .padding(.bottom, TabBar.reservedHeight + 24)
+        .padding(.bottom, 24)
     }
 }
 

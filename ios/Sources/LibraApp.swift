@@ -21,16 +21,35 @@ struct LibraApp: App {
     }
 }
 
+enum Tab: String, CaseIterable {
+    case weigh, history, settings
+
+    var title: String {
+        switch self {
+        case .weigh: return "Вес"
+        case .history: return "История"
+        case .settings: return "Настройки"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .weigh: return "scalemass"
+        case .history: return "chart.xyaxis.line"
+        case .settings: return "slider.horizontal.3"
+        }
+    }
+}
+
 struct RootView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(ScaleManager.self) private var scale
     @Environment(HealthStore.self) private var health
     @Environment(\.palette) private var palette
     @Environment(\.modelContext) private var context
+    @Environment(\.scenePhase) private var scenePhase
 
     @Query(sort: \WeighIn.date, order: .forward) private var items: [WeighIn]
-
-    @Environment(\.scenePhase) private var scenePhase
 
     @State private var tab: Tab = .weigh
     @State private var sheet: ActiveSheet?
@@ -53,48 +72,29 @@ struct RootView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            palette.bg.ignoresSafeArea()
+        // Панель вкладок — системная: на iOS 26 она сама рисуется «жидким стеклом»
+        // и сама отводит место содержимому. Содержимое неактивной вкладки НЕ строится
+        // (заглушка обязана быть непустой, иначе SwiftUI убирает кнопку вкладки).
+        TabView(selection: $tab) {
+            Group { if tab == .weigh { weighTab } else { Color.clear } }
+                .tabItem { Label(Tab.weigh.title, systemImage: Tab.weigh.symbol) }
+                .tag(Tab.weigh)
 
+            Group { if tab == .history { historyTab } else { Color.clear } }
+                .tabItem { Label(Tab.history.title, systemImage: Tab.history.symbol) }
+                .tag(Tab.history)
+
+            Group { if tab == .settings { settingsTab } else { Color.clear } }
+                .tabItem { Label(Tab.settings.title, systemImage: Tab.settings.symbol) }
+                .tag(Tab.settings)
+        }
+        .background {
             GeometryReader { proxy in
                 Color.clear
                     .onAppear { screenHeight = proxy.size.height }
                     .onChange(of: proxy.size.height) { _, new in screenHeight = new }
             }
             .ignoresSafeArea()
-
-            ScrollView {
-                VStack(spacing: 0) {
-                    switch tab {
-                    case .weigh:
-                        MainView(items: items,
-                                 onManualAdd: { showManualEntry = true },
-                                 onGoal: { tab = .settings },
-                                 onOpenHistory: { tab = .history },
-                                 onOpenDay: { selectedDay = $0 })
-                    case .history:
-                        HistoryView(items: items, onOpenDay: { selectedDay = $0 })
-                    case .settings:
-                        SettingsView(items: items,
-                                     onSearchScale: { sheet = .connect },
-                                     onImportHealth: { sheet = .healthImport },
-                                     onRestartOnboarding: { showOnboarding = true })
-                    }
-                    // Прижимает содержимое к верху, когда истории мало и экран
-                    // не заполнен: иначе короткий экран уезжает вниз.
-                    Spacer(minLength: 0)
-                }
-                .frame(minHeight: screenHeight, alignment: .top)
-            }
-            .scrollIndicators(.hidden)
-            // Отсчёт от физического верха экрана, как в макете: там все экраны
-            // начинаются с отступа 58, а статус-бар лежит поверх содержимого.
-            // Без этого отступ «плавает» между запусками.
-            .ignoresSafeArea(edges: [.top, .bottom])
-            // Своя прокрутка на вкладку: иначе позиция переносится с предыдущей.
-            .id(tab)
-
-            TabBar(selection: $tab)
         }
         .ignoresSafeArea(.keyboard)
         .onAppear(perform: configure)
@@ -115,18 +115,18 @@ struct RootView: View {
                 scale.startSearching()
             }
         }
+        .fullScreenCover(isPresented: $showOnboarding) {
+            // Шторку поиска онбординг показывает сам: два модальных экрана с одного
+            // контроллера UIKit не показывает, и запрос молча терялся.
+            OnboardingView(sheetHeight: sheetHeight(topInset: 120),
+                           onFinish: { showOnboarding = false })
+        }
         .sheet(isPresented: $showManualEntry) {
             ManualWeightSheet(lastWeight: items.last?.weightKg) { weight, date in
                 addManual(weight: weight, date: date)
             }
             .presentationDetents([.height(sheetHeight(topInset: 150))])
             .presentationCornerRadius(22)
-        }
-        .fullScreenCover(isPresented: $showOnboarding) {
-            // Шторку поиска онбординг показывает сам: два модальных экрана с одного
-            // контроллера UIKit не показывает, и запрос молча терялся.
-            OnboardingView(sheetHeight: sheetHeight(topInset: 120),
-                           onFinish: { showOnboarding = false })
         }
         .sheet(item: $sheet) { which in
             switch which {
@@ -146,6 +146,52 @@ struct RootView: View {
                 .presentationCornerRadius(22)
         }
     }
+
+    // MARK: - Вкладки
+
+    /// Общая обёртка: фон во весь экран и прокрутка, начинающаяся от физического
+    /// верха (в макете все экраны отсчитывают свои 58 пунктов оттуда, а статус-бар
+    /// лежит поверх содержимого). Низ безопасной зоны не трогаем — там панель вкладок.
+    private func screen<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        ZStack(alignment: .top) {
+            palette.bg.ignoresSafeArea()
+            ScrollView {
+                VStack(spacing: 0) {
+                    content()
+                    Spacer(minLength: 0)
+                }
+            }
+            .scrollIndicators(.hidden)
+            .ignoresSafeArea(edges: .top)
+        }
+    }
+
+    private var weighTab: some View {
+        screen {
+            MainView(items: items,
+                     onManualAdd: { showManualEntry = true },
+                     onGoal: { tab = .settings },
+                     onOpenHistory: { tab = .history },
+                     onOpenDay: { selectedDay = $0 })
+        }
+    }
+
+    private var historyTab: some View {
+        screen {
+            HistoryView(items: items, onOpenDay: { selectedDay = $0 })
+        }
+    }
+
+    private var settingsTab: some View {
+        screen {
+            SettingsView(items: items,
+                         onSearchScale: { sheet = .connect },
+                         onImportHealth: { sheet = .healthImport },
+                         onRestartOnboarding: { showOnboarding = true })
+        }
+    }
+
+    // MARK: - Данные
 
     private func configure() {
         #if DEBUG
