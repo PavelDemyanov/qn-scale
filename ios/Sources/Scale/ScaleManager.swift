@@ -273,8 +273,9 @@ extension ScaleManager: CBCentralManagerDelegate {
             self.log("весы отключились")
             self.peripheral = nil
             self.writeCharacteristic = nil
-            // Весы засыпают после взвешивания — ждём следующего пробуждения.
-            if self.state != .finished { self.startSearching() }
+            // Весы засыпают после взвешивания — сразу возвращаемся к прослушиванию
+            // эфира, чтобы следующее взвешивание подхватилось само.
+            self.startSearching()
         }
     }
 }

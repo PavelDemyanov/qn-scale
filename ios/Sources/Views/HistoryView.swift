@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// История: график с масштабированием щипком, итоги за период и список измерений.
 struct HistoryView: View {
@@ -10,9 +11,17 @@ struct HistoryView: View {
 
     @State private var windowDays: Double = 30
     @State private var endDate: Date?
-    @State private var selected: WeighIn?
+    /// Метку храним датой, а не объектом: при зуме она остаётся привязанной ко времени.
+    @State private var markedDate: Date?
+    /// Палец держит метку — пока держит, её можно двигать.
+    @State private var markerHeld = false
+    @State private var touchX: CGFloat = 0
     @State private var gestureBaseWindow: Double?
     @State private var gestureBaseEnd: Date?
+    @State private var holdTask: Task<Void, Never>?
+
+    private let chartHeight: CGFloat = 240
+    private let axisWidth: CGFloat = 40
 
     private var stats: Stats { Stats(items: items, goal: settings.goalWeight) }
     private var effectiveEnd: Date { endDate ?? items.last?.date ?? Date() }
@@ -28,6 +37,11 @@ struct HistoryView: View {
         return max(7, last.timeIntervalSince(first) / 86_400 + 1)
     }
 
+    private var marked: WeighIn? {
+        guard let markedDate else { return nil }
+        return items.min { abs($0.date.timeIntervalSince(markedDate)) < abs($1.date.timeIntervalSince(markedDate)) }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             LargeTitle(text: "История")
@@ -38,11 +52,14 @@ struct HistoryView: View {
             if items.isEmpty {
                 emptyState
             } else {
-                // Сброс сдвига и выделения — только при выборе периода кнопкой.
-                // На onChange он бы срабатывал и на каждом шаге щипка, отменяя сдвиг.
                 Segmented(items: [(7.0, "7 дней"), (30.0, "30 дней"), (90.0, "90 дней"), (allDays, "Всё")],
                           selection: Binding(get: { windowDays },
-                                             set: { windowDays = $0; endDate = nil; selected = nil }))
+                                             set: { value in
+                                                 withAnimation(.smooth(duration: 0.45)) {
+                                                     windowDays = value
+                                                     endDate = nil
+                                                 }
+                                             }))
                     .cardInset()
                     .padding(.bottom, 14)
 
@@ -52,7 +69,7 @@ struct HistoryView: View {
             }
         }
         .padding(.top, 58)
-        .padding(.bottom, 110)
+        .padding(.bottom, TabBar.reservedHeight + 24)
     }
 
     private var emptyState: some View {
@@ -85,6 +102,7 @@ struct HistoryView: View {
                         Text(spanLabel)
                             .font(.system(size: 24, weight: .semibold))
                             .monospacedDigit()
+                            .contentTransition(.numericText())
                             .foregroundStyle(palette.fg)
                         Text("кг")
                             .font(.system(size: 13))
@@ -92,7 +110,7 @@ struct HistoryView: View {
                     }
                 }
                 Spacer()
-                Text("щипок — масштаб\nперетаскивание — сдвиг")
+                Text("задержите палец — метка\nщипок — масштаб")
                     .font(.system(size: 10))
                     .multilineTextAlignment(.trailing)
                     .foregroundStyle(palette.fg3)
@@ -104,7 +122,7 @@ struct HistoryView: View {
             GeometryReader { proxy in
                 chartBody(width: proxy.size.width)
             }
-            .frame(height: 240)
+            .frame(height: chartHeight)
         }
         .padding(.horizontal, 12)
         .padding(.top, 14)
@@ -119,74 +137,102 @@ struct HistoryView: View {
         return "\(Fmt.n(lo, 1)) – \(Fmt.n(hi, 1))"
     }
 
-    private func chartBody(width: CGFloat) -> some View {
-        let size = CGSize(width: width, height: 240)
-        let geo = ChartGeometry.build(
-            items: items, goal: settings.goalWeight, windowDays: windowDays,
-            endDate: effectiveEnd, size: size,
-            padding: .init(top: 14, bottom: 28, leading: 2, trailing: 40),
-            forecastDays: windowDays * 0.3, slope: stats.slope)
+    private func geometry(width: CGFloat) -> ChartGeometry {
+        ChartGeometry.build(items: items, goal: settings.goalWeight, windowDays: windowDays,
+                            endDate: effectiveEnd,
+                            size: CGSize(width: width, height: chartHeight),
+                            padding: .init(top: 14, bottom: 28, leading: 2, trailing: axisWidth),
+                            forecastDays: settings.showForecast ? windowDays * 0.3 : 0,
+                            slope: stats.slope)
+    }
 
-        let selPoint = selected.flatMap { s in geo.samples.first { $0.item.id == s.id }?.point }
+    private func chartBody(width: CGFloat) -> some View {
+        let geo = geometry(width: width)
+        let markPoint = marked.map { CGPoint(x: geo.x($0.date), y: geo.y($0.weightKg)) }
 
         return ZStack(alignment: .topLeading) {
-            // Засечки идут ПЕРВЫМИ — иначе серые волоски ложатся поверх кривой.
+            // Засечки идут первыми — иначе серые волоски ложатся поверх кривой.
             ForEach(0..<4, id: \.self) { i in
                 let y = geo.y(geo.lo + (geo.hi - geo.lo) * (Double(i) / 3))
                 Rectangle()
                     .fill(palette.sep)
-                    .frame(width: size.width - 40, height: 0.5)
-                    .position(x: (size.width - 40) / 2, y: y)
+                    .frame(width: width - axisWidth, height: 0.5)
+                    .position(x: (width - axisWidth) / 2, y: y)
             }
 
-            WeightChart(geometry: geo,
-                        showDots: windowDays <= 45,
-                        selected: selPoint)
+            WeightChart(items: items, goal: settings.goalWeight, slope: stats.slope,
+                        size: CGSize(width: width, height: chartHeight),
+                        padding: .init(top: 14, bottom: 28, leading: 2, trailing: axisWidth),
+                        windowDays: windowDays, endDate: effectiveEnd,
+                        forecastFraction: 0.3,
+                        showGoalLine: settings.showGoalLine,
+                        showForecast: settings.showForecast,
+                        showDots: windowDays <= 45)
 
-            // Подписи по оси весов — справа от поля графика
+            axisLabels(geo: geo, width: width)
+
+            if let markPoint, let marked {
+                marker(at: markPoint)
+                tooltip(for: marked)
+                    .offset(x: min(max(0, markPoint.x - 50), max(0, width - axisWidth - 116)), y: 2)
+            }
+        }
+        .animation(.smooth(duration: 0.45), value: windowDays)
+        .animation(.smooth(duration: 0.25), value: markedDate)
+        .contentShape(Rectangle())
+        .gesture(dragGesture(width: width, geo: geo))
+        .simultaneousGesture(zoomGesture)
+    }
+
+    private func marker(at point: CGPoint) -> some View {
+        ZStack(alignment: .topLeading) {
+            Path { p in
+                p.move(to: CGPoint(x: point.x, y: 8))
+                p.addLine(to: CGPoint(x: point.x, y: chartHeight - 28))
+            }
+            .stroke(palette.fg3, lineWidth: 1)
+            Circle()
+                .fill(palette.blue)
+                .overlay(Circle().stroke(palette.card, lineWidth: 2.5))
+                .frame(width: markerHeld ? 14 : 10, height: markerHeld ? 14 : 10)
+                .position(point)
+        }
+        .animation(.snappy(duration: 0.15), value: markerHeld)
+    }
+
+    private func axisLabels(geo: ChartGeometry, width: CGFloat) -> some View {
+        ZStack(alignment: .topLeading) {
+            // Подписи по оси весов — в полосе справа от поля графика
             ForEach(0..<4, id: \.self) { i in
                 let w = geo.lo + (geo.hi - geo.lo) * (Double(i) / 3)
                 Text(Fmt.n(w, 1))
                     .font(.system(size: 10.5))
                     .monospacedDigit()
                     .foregroundStyle(palette.fg3)
-                    .frame(width: 38, alignment: .trailing)
-                    .position(x: size.width - 19, y: geo.y(w))
+                    .frame(width: axisWidth - 2, alignment: .trailing)
+                    .position(x: width - axisWidth / 2, y: geo.y(w))
             }
 
-            if geo.goalInRange {
+            if settings.showGoalLine, geo.goalInRange {
                 Text(Fmt.n(settings.goalWeight, 1))
                     .font(.system(size: 10.5, weight: .semibold))
                     .monospacedDigit()
                     .foregroundStyle(palette.green)
-                    .frame(width: 38, alignment: .trailing)
-                    .position(x: size.width - 19, y: geo.goalY)
+                    .frame(width: axisWidth - 2, alignment: .trailing)
+                    .position(x: width - axisWidth / 2, y: geo.goalY)
             }
 
-            // Подписи по оси времени
+            // Подписи дат: центр зажимаем так, чтобы текст не вылезал за плашку
             ForEach(0..<3, id: \.self) { i in
                 let t = geo.t0.addingTimeInterval(geo.t1.timeIntervalSince(geo.t0) * Double(i) / 2)
+                let half: CGFloat = 27
                 Text(Fmt.shortDayMonth(t))
                     .font(.system(size: 10.5))
+                    .lineLimit(1)
+                    .fixedSize()
                     .foregroundStyle(palette.fg3)
-                    .position(x: geo.x(t), y: 232)
-            }
-
-            if let selected, let point = selPoint {
-                // Смещение, а не .position: тот задаёт центр, и подсказка вылезала
-                // за верхний край графика. Левый край — как в макете, с зажимом.
-                tooltip(for: selected)
-                    .offset(x: min(max(0, point.x - 50), max(0, size.width - 156)), y: 2)
-            }
-        }
-        .contentShape(Rectangle())
-        .gesture(dragGesture(width: width))
-        .simultaneousGesture(zoomGesture)
-        .onTapGesture { location in
-            if let hit = geo.nearest(toX: location.x) {
-                selected = selected?.id == hit.item.id ? nil : hit.item
-            } else {
-                selected = nil
+                    .position(x: min(max(half, geo.x(t)), width - axisWidth - half + 20),
+                              y: chartHeight - 8)
             }
         }
     }
@@ -214,18 +260,57 @@ struct HistoryView: View {
 
     // MARK: - Жесты
 
-    private func dragGesture(width: CGFloat) -> some Gesture {
-        DragGesture(minimumDistance: 6)
+    private func mark(atX x: CGFloat, geo: ChartGeometry) {
+        if let hit = geo.nearest(toX: x, maxDistance: .greatestFiniteMagnitude) {
+            markedDate = hit.item.date
+        }
+    }
+
+    /// Один жест на всё: пока палец стоит на месте — отсчитываем удержание и
+    /// включаем метку, поехал раньше — это панорамирование. Раздельные жесты
+    /// (LongPress + Drag) здесь не годятся: включение метки перестраивает вью,
+    /// и текущая протяжка обрывается, метка перестаёт ехать за пальцем.
+    private func dragGesture(width: CGFloat, geo: ChartGeometry) -> some Gesture {
+        DragGesture(minimumDistance: 0)
             .onChanged { value in
+                touchX = value.location.x
+
+                if holdTask == nil, !markerHeld {
+                    let startX = value.startLocation.x
+                    holdTask = Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(550))
+                        guard !Task.isCancelled else { return }
+                        markerHeld = true
+                        mark(atX: startX, geo: geo)
+                        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+                    }
+                }
+
+                if markerHeld {
+                    mark(atX: value.location.x, geo: geo)
+                    return
+                }
+
+                guard abs(value.translation.width) > 6 else { return }
+                // Палец поехал — это уже сдвиг графика, метку не ставим
+                holdTask?.cancel()
                 guard let first = items.first?.date, let last = items.last?.date else { return }
                 let base = gestureBaseEnd ?? effectiveEnd
                 if gestureBaseEnd == nil { gestureBaseEnd = base }
                 let shift = Double(value.translation.width / max(width, 1)) * windowDays * 86_400
                 let lowerBound = first.addingTimeInterval(windowDays * 86_400 * 0.4)
-                let candidate = base.addingTimeInterval(-shift)
-                endDate = min(last, max(lowerBound, candidate))
+                endDate = min(last, max(lowerBound, base.addingTimeInterval(-shift)))
             }
-            .onEnded { _ in gestureBaseEnd = nil }
+            .onEnded { value in
+                holdTask?.cancel()
+                holdTask = nil
+                // Короткий тап без удержания — снять метку
+                if !markerHeld, abs(value.translation.width) < 6, abs(value.translation.height) < 6 {
+                    markedDate = nil
+                }
+                markerHeld = false
+                gestureBaseEnd = nil
+            }
     }
 
     private var zoomGesture: some Gesture {
@@ -233,8 +318,13 @@ struct HistoryView: View {
             .onChanged { value in
                 let base = gestureBaseWindow ?? windowDays
                 if gestureBaseWindow == nil { gestureBaseWindow = base }
-                windowDays = min(3650, max(7, base / value.magnification))
-                selected = nil
+                windowDays = min(max(7, allDays), max(7, base / value.magnification))
+                // Держим метку по центру окна, если она поставлена
+                if let markedDate, let first = items.first?.date, let last = items.last?.date {
+                    let centered = markedDate.addingTimeInterval(windowDays * 86_400 / 2)
+                    let lowerBound = first.addingTimeInterval(windowDays * 86_400 * 0.4)
+                    endDate = min(last, max(lowerBound, centered))
+                }
             }
             .onEnded { _ in gestureBaseWindow = nil }
     }

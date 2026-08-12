@@ -34,6 +34,10 @@ final class AppSettings {
     var knownScaleID: String? { didSet { d.set(knownScaleID, forKey: "knownScaleID") } }
     var knownScaleMAC: String? { didSet { d.set(knownScaleMAC, forKey: "knownScaleMAC") } }
     var importedFromHealth: Int { didSet { d.set(importedFromHealth, forKey: "importedFromHealth") } }
+    /// Зелёный пунктир цели на графиках.
+    var showGoalLine: Bool { didSet { d.set(showGoalLine, forKey: "showGoalLine") } }
+    /// Серый пунктир прогноза и разделы с предсказанным весом.
+    var showForecast: Bool { didSet { d.set(showForecast, forKey: "showForecast") } }
 
     static let reminderTimes = ["6:30", "7:00", "7:30", "8:00", "8:30", "9:00", "9:30", "10:00"]
 
@@ -51,6 +55,9 @@ final class AppSettings {
         knownScaleID = d.string(forKey: "knownScaleID")
         knownScaleMAC = d.string(forKey: "knownScaleMAC")
         importedFromHealth = d.integer(forKey: "importedFromHealth")
+        // По умолчанию обе линии включены — но только если пользователь их ещё не трогал.
+        showGoalLine = d.object(forKey: "showGoalLine") as? Bool ?? true
+        showForecast = d.object(forKey: "showForecast") as? Bool ?? true
     }
 
     var palette: Palette { theme.palette }

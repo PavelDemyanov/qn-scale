@@ -27,6 +27,7 @@ struct SettingsView: View {
 
             scaleSection
             goalSection
+            chartSection
             healthSection
             remindersSection
             profileSection
@@ -169,6 +170,31 @@ struct SettingsView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: - График
+
+    private var chartSection: some View {
+        @Bindable var s = settings
+        return VStack(spacing: 0) {
+            SectionHeader(text: "ГРАФИК")
+            VStack(spacing: 0) {
+                Row(title: "Линия цели", minHeight: 52) {
+                    Toggle("", isOn: $s.showGoalLine)
+                        .labelsHidden()
+                        .tint(palette.green)
+                }
+                RowSeparator()
+                Row(title: "Прогноз веса", minHeight: 52) {
+                    Toggle("", isOn: $s.showForecast)
+                        .labelsHidden()
+                        .tint(palette.green)
+                }
+            }
+            .card()
+            .cardInset()
+            SectionFooter(text: "Зелёный пунктир — цель, серый — прогноз по текущему темпу. Выключенные линии пропадают на всех графиках, а вместе с прогнозом — и предсказанные цифры.")
+        }
     }
 
     // MARK: - Здоровье

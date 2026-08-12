@@ -30,10 +30,13 @@ struct RootView: View {
 
     @Query(sort: \WeighIn.date, order: .forward) private var items: [WeighIn]
 
+    @Environment(\.scenePhase) private var scenePhase
+
     @State private var tab: Tab = .weigh
     @State private var sheet: ActiveSheet?
     @State private var showLive = false
     @State private var showOnboarding = false
+    @State private var showManualEntry = false
     @State private var selectedDay: WeighIn?
 
     private enum ActiveSheet: Identifiable {
@@ -61,21 +64,27 @@ struct RootView: View {
             .ignoresSafeArea()
 
             ScrollView {
-                switch tab {
-                case .weigh:
-                    MainView(items: items,
-                             onWeigh: { showLive = true },
-                             onGoal: { tab = .settings },
-                             onOpenHistory: { tab = .history },
-                             onOpenDay: { selectedDay = $0 })
-                case .history:
-                    HistoryView(items: items, onOpenDay: { selectedDay = $0 })
-                case .settings:
-                    SettingsView(items: items,
-                                 onSearchScale: { sheet = .connect },
-                                 onImportHealth: { sheet = .healthImport },
-                                 onRestartOnboarding: { showOnboarding = true })
+                VStack(spacing: 0) {
+                    switch tab {
+                    case .weigh:
+                        MainView(items: items,
+                                 onManualAdd: { showManualEntry = true },
+                                 onGoal: { tab = .settings },
+                                 onOpenHistory: { tab = .history },
+                                 onOpenDay: { selectedDay = $0 })
+                    case .history:
+                        HistoryView(items: items, onOpenDay: { selectedDay = $0 })
+                    case .settings:
+                        SettingsView(items: items,
+                                     onSearchScale: { sheet = .connect },
+                                     onImportHealth: { sheet = .healthImport },
+                                     onRestartOnboarding: { showOnboarding = true })
+                    }
+                    // Прижимает содержимое к верху, когда истории мало и экран
+                    // не заполнен: иначе короткий экран уезжает вниз.
+                    Spacer(minLength: 0)
                 }
+                .frame(minHeight: screenHeight, alignment: .top)
             }
             .scrollIndicators(.hidden)
             // Отсчёт от физического верха экрана, как в макете: там все экраны
@@ -89,15 +98,29 @@ struct RootView: View {
         }
         .ignoresSafeArea(.keyboard)
         .onAppear(perform: configure)
+        // Пока приложение открыто, оно всё время слушает эфир: наступили на весы —
+        // экран взвешивания открывается сам, нажимать ничего не нужно.
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { scale.startSearching() } else { scale.stop() }
+        }
         .onChange(of: scale.liveWeightKg) { old, new in
-            // Встал на весы без нажатия кнопки — показываем взвешивание само.
-            if old == nil, new != nil, sheet == nil, !showOnboarding { showLive = true }
+            if old == nil, new != nil, sheet == nil, selectedDay == nil,
+               !showOnboarding, !showManualEntry {
+                showLive = true
+            }
         }
         .fullScreenCover(isPresented: $showLive) {
             LiveWeighView(items: items) {
                 showLive = false
                 scale.startSearching()
             }
+        }
+        .sheet(isPresented: $showManualEntry) {
+            ManualWeightSheet(lastWeight: items.last?.weightKg) { weight, date in
+                addManual(weight: weight, date: date)
+            }
+            .presentationDetents([.height(sheetHeight(topInset: 150))])
+            .presentationCornerRadius(22)
         }
         .fullScreenCover(isPresented: $showOnboarding) {
             // Шторку поиска онбординг показывает сам: два модальных экрана с одного
@@ -153,6 +176,16 @@ struct RootView: View {
         context.insert(weighIn)
         try? context.save()
 
+        Reminders.cancelToday()
+        let enabled = settings.healthEnabled
+        let profile = settings.profile
+        Task { await health.save(weighIn: weighIn, profile: profile, enabled: enabled) }
+    }
+
+    private func addManual(weight: Double, date: Date) {
+        let weighIn = WeighIn(date: date, weightKg: weight, impedance1: 0, impedance2: 0)
+        context.insert(weighIn)
+        try? context.save()
         Reminders.cancelToday()
         let enabled = settings.healthEnabled
         let profile = settings.profile

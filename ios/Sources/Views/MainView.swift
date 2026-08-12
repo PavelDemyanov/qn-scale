@@ -6,7 +6,7 @@ struct MainView: View {
     @Environment(AppSettings.self) private var settings
 
     let items: [WeighIn]
-    let onWeigh: () -> Void
+    let onManualAdd: () -> Void
     let onGoal: () -> Void
     let onOpenHistory: () -> Void
     let onOpenDay: (WeighIn) -> Void
@@ -16,17 +16,17 @@ struct MainView: View {
     var body: some View {
         Group {
             if items.isEmpty {
-                EmptyState(onWeigh: onWeigh)
+                EmptyState(onManualAdd: onManualAdd)
             } else {
                 switch settings.mainLayout {
-                case .numbers: LayoutNumbers(stats: stats, items: items, onWeigh: onWeigh,
+                case .numbers: LayoutNumbers(stats: stats, items: items, onManualAdd: onManualAdd,
                                              onGoal: onGoal, onOpenHistory: onOpenHistory)
                 case .chart:   LayoutChart(stats: stats, items: items, onGoal: onGoal, onOpenDay: onOpenDay)
-                case .goal:    LayoutGoal(stats: stats, items: items, onWeigh: onWeigh, onGoal: onGoal)
+                case .goal:    LayoutGoal(stats: stats, items: items, onManualAdd: onManualAdd, onGoal: onGoal)
                 }
             }
         }
-        .padding(.bottom, 104)
+        .padding(.bottom, TabBar.reservedHeight + 24)
     }
 }
 
@@ -34,7 +34,7 @@ struct MainView: View {
 
 private struct EmptyState: View {
     @Environment(\.palette) private var palette
-    let onWeigh: () -> Void
+    let onManualAdd: () -> Void
 
     var body: some View {
         VStack(spacing: 14) {
@@ -50,7 +50,7 @@ private struct EmptyState: View {
                 .multilineTextAlignment(.center)
                 .foregroundStyle(palette.fg2)
                 .padding(.horizontal, 40)
-            PrimaryButton(title: "Взвеситься", action: onWeigh)
+            PrimaryButton(title: "Добавить вес вручную", action: onManualAdd)
                 .padding(.horizontal, 16)
                 .padding(.top, 10)
             Spacer()
@@ -88,7 +88,7 @@ private struct LayoutNumbers: View {
     @Environment(AppSettings.self) private var settings
     let stats: Stats
     let items: [WeighIn]
-    let onWeigh: () -> Void
+    let onManualAdd: () -> Void
     let onGoal: () -> Void
     let onOpenHistory: () -> Void
 
@@ -160,7 +160,7 @@ private struct LayoutNumbers: View {
 
             forecastSection
 
-            PrimaryButton(title: "Взвеситься", action: onWeigh)
+            PrimaryButton(title: "Добавить вес вручную", action: onManualAdd)
                 .cardInset()
                 .padding(.top, 3)
         }
@@ -172,11 +172,18 @@ private struct LayoutNumbers: View {
         return Fmt.dayLabel(last.date) + ", " + Fmt.time(last.date)
     }
 
+    private var goalSubtitle: String {
+        guard settings.showForecast else { return "осталось до цели" }
+        return stats.ratePerWeek.map { "темп \(Fmt.signed($0)) кг/нед" } ?? "темп пока не посчитать"
+    }
+
     private var forecastSection: some View {
         VStack(spacing: 0) {
-            SectionHeader(text: "ПРОГНОЗ ПО ТЕКУЩЕМУ ТЕМПУ", top: 2)
+            SectionHeader(text: settings.showForecast ? "ПРОГНОЗ ПО ТЕКУЩЕМУ ТЕМПУ" : "ЦЕЛЬ", top: 2)
             VStack(spacing: 0) {
-                ForEach([(7.0, "Через неделю"), (14.0, "Через 2 недели"), (30.0, "Через месяц")], id: \.0) { days, label in
+                ForEach(settings.showForecast
+                        ? [(7.0, "Через неделю"), (14.0, "Через 2 недели"), (30.0, "Через месяц")]
+                        : [], id: \.0) { days, label in
                     Row(title: label, minHeight: 41) {
                         Text(stats.forecast(days: days).map { "\(Fmt.n($0)) кг" } ?? "—")
                             .font(.system(size: 16, weight: .medium))
@@ -187,9 +194,10 @@ private struct LayoutNumbers: View {
                 }
                 Button(action: onGoal) {
                     Row(title: "Цель \(Fmt.n(settings.goalWeight, 1)) кг",
-                        subtitle: stats.ratePerWeek.map { "темп \(Fmt.signed($0)) кг/нед" } ?? "темп пока не посчитать",
-                        minHeight: 45) {
-                        Text(stats.goalDateLabel)
+                        subtitle: goalSubtitle, minHeight: 45) {
+                        Text(settings.showForecast
+                             ? stats.goalDateLabel
+                             : (stats.toGoal.map { "\(Fmt.n($0)) кг" } ?? "—"))
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(palette.green)
                     }
@@ -220,6 +228,7 @@ private struct SparkCard: View {
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(palette.fg)
                     Spacer()
+                    if settings.showGoalLine {
                     HStack(spacing: 6) {
                         // Пунктир, как линия цели на самом графике
                         Path { p in
@@ -233,20 +242,27 @@ private struct SparkCard: View {
                             .monospacedDigit()
                             .foregroundStyle(palette.fg2)
                     }
+                    }
                 }
                 .padding(.horizontal, 4)
                 .padding(.bottom, 8)
 
                 GeometryReader { proxy in
+                    let size = CGSize(width: proxy.size.width, height: height)
+                    let inset = ChartGeometry.Padding(top: 5, bottom: 5, leading: 3, trailing: 3)
                     let geo = ChartGeometry.build(
                         items: items, goal: settings.goalWeight, windowDays: 30,
-                        endDate: stats.last?.date ?? Date(),
-                        size: CGSize(width: proxy.size.width, height: height),
-                        padding: .init(top: 5, bottom: 5, leading: 3, trailing: 3),
-                        forecastDays: 9, slope: stats.slope)
+                        endDate: stats.last?.date ?? Date(), size: size, padding: inset,
+                        forecastDays: settings.showForecast ? 9 : 0, slope: stats.slope)
 
                     ZStack(alignment: .topLeading) {
-                        WeightChart(geometry: geo, lineWidth: 2.2)
+                        WeightChart(items: items, goal: settings.goalWeight, slope: stats.slope,
+                                    size: size, padding: inset, windowDays: 30,
+                                    endDate: stats.last?.date ?? Date(),
+                                    forecastFraction: 0.3,
+                                    showGoalLine: settings.showGoalLine,
+                                    showForecast: settings.showForecast,
+                                    lineWidth: 2.2)
                         if let end = geo.lastPoint {
                             ChartEndDot(point: end, ringColor: palette.card)
                         }
@@ -312,14 +328,20 @@ private struct LayoutChart: View {
     private var hero: some View {
         GeometryReader { proxy in
             let size = CGSize(width: proxy.size.width, height: 322)
+            let inset = ChartGeometry.Padding(top: 152, bottom: 64, leading: 0, trailing: 0)
             let geo = ChartGeometry.build(
                 items: items, goal: settings.goalWeight, windowDays: window,
-                endDate: stats.last?.date ?? Date(), size: size,
-                padding: .init(top: 152, bottom: 64, leading: 0, trailing: 0),
-                forecastDays: window * 0.3, slope: stats.slope, includeGoal: false)
+                endDate: stats.last?.date ?? Date(), size: size, padding: inset,
+                forecastDays: settings.showForecast ? window * 0.3 : 0,
+                slope: stats.slope, includeGoal: false)
 
             ZStack(alignment: .topLeading) {
-                WeightChart(geometry: geo, showGoalLine: false, lineWidth: 2.4)
+                WeightChart(items: items, goal: settings.goalWeight, slope: stats.slope,
+                            size: size, padding: inset, windowDays: window,
+                            endDate: stats.last?.date ?? Date(),
+                            forecastFraction: 0.3, includeGoal: false,
+                            showGoalLine: false, showForecast: settings.showForecast,
+                            lineWidth: 2.4)
                 if let end = geo.lastPoint {
                     ChartEndDot(point: end, ringColor: palette.bg)
                 }
@@ -495,20 +517,20 @@ private struct LayoutGoal: View {
     @Environment(AppSettings.self) private var settings
     let stats: Stats
     let items: [WeighIn]
-    let onWeigh: () -> Void
+    let onManualAdd: () -> Void
     let onGoal: () -> Void
 
     var body: some View {
         VStack(spacing: 13) {
             ScreenHeader(lastLabel: "", trailing: AnyView(
-                Button("Взвеситься", action: onWeigh)
+                Button("Добавить", action: onManualAdd)
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(palette.blue)
             ))
 
             ring
             weekBars
-            forecastCard
+            if settings.showForecast { forecastCard }
 
             HStack(spacing: 11) {
                 DeltaTile(caption: "НЕДЕЛЯ", value: stats.weekDelta)
