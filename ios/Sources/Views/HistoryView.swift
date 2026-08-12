@@ -1,7 +1,10 @@
 import SwiftUI
-import UIKit
 
-/// История: график с масштабированием щипком, итоги за период и список измерений.
+/// История: график с щёткой, итоги за окно и список измерений.
+///
+/// Живое окно живёт в `WeightChartModel` и читается ТОЛЬКО карточкой графика.
+/// Этот экран читает `digest` — сводку по зафиксированному окну, — поэтому на
+/// кадрах жеста список не перестраивается вовсе.
 struct HistoryView: View {
     @Environment(\.palette) private var palette
     @Environment(AppSettings.self) private var settings
@@ -9,37 +12,24 @@ struct HistoryView: View {
     let items: [WeighIn]
     let onOpenDay: (WeighIn) -> Void
 
-    @State private var windowDays: Double = 30
-    @State private var endDate: Date?
-    /// Метку храним датой, а не объектом: при зуме она остаётся привязанной ко времени.
-    @State private var markedDate: Date?
-    /// Палец держит метку — пока держит, её можно двигать.
-    @State private var markerHeld = false
-    @State private var touchX: CGFloat = 0
-    @State private var gestureBaseWindow: Double?
-    @State private var gestureBaseEnd: Date?
-    @State private var holdTask: Task<Void, Never>?
+    @State private var model = WeightChartModel()
 
-    private let chartHeight: CGFloat = 240
-    private let axisWidth: CGFloat = 40
-
-    private var stats: Stats { Stats(items: items, goal: settings.goalWeight) }
-    private var effectiveEnd: Date { endDate ?? items.last?.date ?? Date() }
-
-    private var visible: [WeighIn] {
-        let start = effectiveEnd.addingTimeInterval(-windowDays * 86_400)
-        return items.filter { $0.date >= start && $0.date <= effectiveEnd }
+    /// Ключ пересборки снимка. Взвешивания только добавляются и удаляются —
+    /// правки веса в середине истории в приложении нет, поэтому количество и
+    /// крайние даты ключ исчерпывают.
+    private struct SnapshotKey: Equatable {
+        var count: Int
+        var first: Date?
+        var last: Date?
+        var goal: Double
+        var forecast: Bool
+        var profile: Profile
     }
 
-    /// «Всё» — ровно длина истории, а не условные десять лет.
-    private var allDays: Double {
-        guard let first = items.first?.date, let last = items.last?.date else { return 30 }
-        return max(7, last.timeIntervalSince(first) / 86_400 + 1)
-    }
-
-    private var marked: WeighIn? {
-        guard let markedDate else { return nil }
-        return items.min { abs($0.date.timeIntervalSince(markedDate)) < abs($1.date.timeIntervalSince(markedDate)) }
+    private var key: SnapshotKey {
+        SnapshotKey(count: items.count, first: items.first?.date, last: items.last?.date,
+                    goal: settings.goalWeight, forecast: settings.showForecast,
+                    profile: settings.profile)
     }
 
     var body: some View {
@@ -49,34 +39,46 @@ struct HistoryView: View {
             } else {
                 List {
                     Section {
-                        periodPicker
-                        chartCard
+                        // Переключатель — ОТДЕЛЬНОЙ строкой, а не внутри карточки:
+                        // внутри он рисовался, но в область нажатия строки не
+                        // попадал и молча не работал, пока список не прокрутят.
+                        Picker("Период", selection: periodBinding) {
+                            // Только те пресеты, что на этой истории означают
+                            // разное: на трёхдневной «30 дней» и «Всё» — одно
+                            // и то же окно.
+                            ForEach(model.timeline.availablePeriods) { p in
+                                Text(p.title).tag(Optional(p))
+                            }
+                        }
+                        .pickerStyle(.segmented)
+
+                        HistoryChartCard(model: model)
                     }
                     .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
 
                     summarySection
                     measurementsSection
                 }
+                // Прокрутку гасим только на время жеста ПО ГРАФИКУ и метки.
+                // Для щётки — НЕ гасим: переключение `scrollDisabled` посреди
+                // жеста само способно его отменить, а от отмены щётку защищает
+                // `@GestureState`.
+                .scrollDisabled(model.gesturing || model.markerHeld)
             }
+        }
+        .onChange(of: key, initial: true) { _, k in
+            model.digestGoal = k.goal
+            model.digestForecast = k.forecast
+            model.reload(items: items, settings: settings)
         }
     }
 
-    /// Выбор периода — системный сегментированный переключатель.
-    private var periodPicker: some View {
-        Picker("Период", selection: Binding(get: { windowDays },
-                                            set: { value in
-                                                // БЕЗ анимации: плавная смена
-                                                // периода снята 12.08.2026.
-                                                windowDays = value
-                                                endDate = nil
-                                            })) {
-            Text("7 дней").tag(7.0)
-            Text("30 дней").tag(30.0)
-            Text("90 дней").tag(90.0)
-            Text("Всё").tag(allDays)
-        }
-        .pickerStyle(.segmented)
-        .padding(.bottom, 6)
+    /// Выбранный период. `nil` — окно не совпадает ни с одним пресетом (щипок
+    /// или щётка), и тогда не подсвечен ни один сегмент: подсветить наугад
+    /// значит соврать ровно там, где щётка говорит правду.
+    private var periodBinding: Binding<WeightPeriod?> {
+        Binding(get: { model.period },
+                set: { if let p = $0 { model.apply(p) } })
     }
 
     private var emptyState: some View {
@@ -85,282 +87,48 @@ struct HistoryView: View {
                                description: Text("Встаньте на весы — первое измерение появится здесь."))
     }
 
-    // MARK: - График
-
-    private var chartCard: some View {
-        VStack(spacing: 0) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("диапазон · \(Int(windowDays.rounded())) дн.")
-                        .font(.system(size: 12))
-                        .foregroundStyle(palette.fg2)
-                    HStack(alignment: .lastTextBaseline, spacing: 5) {
-                        Text(spanLabel)
-                            .font(.system(size: 24, weight: .semibold))
-                            .monospacedDigit()
-                            .contentTransition(.numericText())
-                            .foregroundStyle(palette.fg)
-                        Text("кг")
-                            .font(.system(size: 13))
-                            .foregroundStyle(palette.fg2)
-                    }
-                }
-                Spacer()
-                Text("задержите палец — метка\nщипок — масштаб")
-                    .font(.system(size: 10))
-                    .multilineTextAlignment(.trailing)
-                    .foregroundStyle(palette.fg3)
-                    .padding(.top, 3)
-            }
-            .padding(.horizontal, 6)
-            .padding(.bottom, 8)
-
-            GeometryReader { proxy in
-                chartBody(width: proxy.size.width)
-            }
-            .frame(height: chartHeight)
-        }
-    }
-
-    private var spanLabel: String {
-        let ws = visible.map(\.weightKg)
-        guard let lo = ws.min(), let hi = ws.max() else { return "—" }
-        return "\(Fmt.n(lo, 1)) – \(Fmt.n(hi, 1))"
-    }
-
-    private func geometry(width: CGFloat) -> ChartGeometry {
-        ChartGeometry.build(items: items, goal: settings.goalWeight, windowDays: windowDays,
-                            endDate: effectiveEnd,
-                            size: CGSize(width: width, height: chartHeight),
-                            padding: .init(top: 14, bottom: 28, leading: 2, trailing: axisWidth),
-                            forecastDays: settings.showForecast ? windowDays * 0.3 : 0,
-                            slope: stats.slope)
-    }
-
-    private func chartBody(width: CGFloat) -> some View {
-        let geo = geometry(width: width)
-        let markPoint = marked.map { CGPoint(x: geo.x($0.date), y: geo.y($0.weightKg)) }
-
-        return ZStack(alignment: .topLeading) {
-            // Засечки идут первыми — иначе серые волоски ложатся поверх кривой.
-            ForEach(0..<4, id: \.self) { i in
-                let y = geo.y(geo.lo + (geo.hi - geo.lo) * (Double(i) / 3))
-                Rectangle()
-                    .fill(palette.sep)
-                    .frame(width: width - axisWidth, height: 0.5)
-                    .position(x: (width - axisWidth) / 2, y: y)
-            }
-
-            WeightChart(items: items, goal: settings.goalWeight, slope: stats.slope,
-                        size: CGSize(width: width, height: chartHeight),
-                        padding: .init(top: 14, bottom: 28, leading: 2, trailing: axisWidth),
-                        windowDays: windowDays, endDate: effectiveEnd,
-                        forecastFraction: 0.3,
-                        showGoalLine: settings.showGoalLine,
-                        showForecast: settings.showForecast,
-                        showDots: windowDays <= 45)
-
-            axisLabels(geo: geo, width: width)
-
-            if let markPoint, let marked {
-                marker(at: markPoint)
-                tooltip(for: marked)
-                    .offset(x: min(max(0, markPoint.x - 50), max(0, width - axisWidth - 116)), y: 2)
-            }
-        }
-        .contentShape(Rectangle())
-        .gesture(dragGesture(width: width, geo: geo))
-        .simultaneousGesture(zoomGesture)
-    }
-
-    private func marker(at point: CGPoint) -> some View {
-        ZStack(alignment: .topLeading) {
-            Path { p in
-                p.move(to: CGPoint(x: point.x, y: 8))
-                p.addLine(to: CGPoint(x: point.x, y: chartHeight - 28))
-            }
-            .stroke(palette.fg3, lineWidth: 1)
-            Circle()
-                .fill(palette.blue)
-                .overlay(Circle().stroke(palette.card, lineWidth: 2.5))
-                .frame(width: markerHeld ? 14 : 10, height: markerHeld ? 14 : 10)
-                .position(point)
-        }
-    }
-
-    private func axisLabels(geo: ChartGeometry, width: CGFloat) -> some View {
-        ZStack(alignment: .topLeading) {
-            // Подписи по оси весов — в полосе справа от поля графика
-            ForEach(0..<4, id: \.self) { i in
-                let w = geo.lo + (geo.hi - geo.lo) * (Double(i) / 3)
-                Text(Fmt.n(w, 1))
-                    .font(.system(size: 10.5))
-                    .monospacedDigit()
-                    .foregroundStyle(palette.fg3)
-                    .frame(width: axisWidth - 2, alignment: .trailing)
-                    .position(x: width - axisWidth / 2, y: geo.y(w))
-            }
-
-            if settings.showGoalLine, geo.goalInRange {
-                Text(Fmt.n(settings.goalWeight, 1))
-                    .font(.system(size: 10.5, weight: .semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(palette.green)
-                    .frame(width: axisWidth - 2, alignment: .trailing)
-                    .position(x: width - axisWidth / 2, y: geo.goalY)
-            }
-
-            // Подписи дат: центр зажимаем так, чтобы текст не вылезал за плашку
-            ForEach(0..<3, id: \.self) { i in
-                let t = geo.t0.addingTimeInterval(geo.t1.timeIntervalSince(geo.t0) * Double(i) / 2)
-                let half: CGFloat = 27
-                Text(Fmt.shortDayMonth(t))
-                    .font(.system(size: 10.5))
-                    .lineLimit(1)
-                    .fixedSize()
-                    .foregroundStyle(palette.fg3)
-                    .position(x: min(max(half, geo.x(t)), width - axisWidth - half + 20),
-                              y: chartHeight - 8)
-            }
-        }
-    }
-
-    private func tooltip(for item: WeighIn) -> some View {
-        let d = delta(for: item)
-        return VStack(alignment: .leading, spacing: 1) {
-            Text(Fmt.dayLabel(item.date) + ", " + Fmt.time(item.date))
-                .font(.system(size: 11))
-                .foregroundStyle(palette.fg2)
-            Text("\(Fmt.n(item.weightKg)) кг")
-                .font(.body.weight(.semibold))
-                .monospacedDigit()
-                .foregroundStyle(palette.fg)
-            Text(d.map { "\(Fmt.signed($0)) кг" } ?? "первое")
-                .font(.system(size: 11, weight: .semibold))
-                .monospacedDigit()
-                .foregroundStyle(d.map { palette.delta($0) } ?? palette.fg3)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
-        .background(palette.card2, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .shadow(color: .black.opacity(0.28), radius: 7, y: 4)
-    }
-
-    // MARK: - Жесты
-
-    private func mark(atX x: CGFloat, geo: ChartGeometry) {
-        if let hit = geo.nearest(toX: x, maxDistance: .greatestFiniteMagnitude) {
-            markedDate = hit.item.date
-        }
-    }
-
-    /// Один жест на всё: пока палец стоит на месте — отсчитываем удержание и
-    /// включаем метку, поехал раньше — это панорамирование. Раздельные жесты
-    /// (LongPress + Drag) здесь не годятся: включение метки перестраивает вью,
-    /// и текущая протяжка обрывается, метка перестаёт ехать за пальцем.
-    private func dragGesture(width: CGFloat, geo: ChartGeometry) -> some Gesture {
-        DragGesture(minimumDistance: 0)
-            .onChanged { value in
-                touchX = value.location.x
-
-                if holdTask == nil, !markerHeld {
-                    let startX = value.startLocation.x
-                    holdTask = Task { @MainActor in
-                        try? await Task.sleep(for: .milliseconds(550))
-                        guard !Task.isCancelled else { return }
-                        markerHeld = true
-                        mark(atX: startX, geo: geo)
-                        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
-                    }
-                }
-
-                if markerHeld {
-                    mark(atX: value.location.x, geo: geo)
-                    return
-                }
-
-                guard abs(value.translation.width) > 6 else { return }
-                // Палец поехал — это уже сдвиг графика, метку не ставим
-                holdTask?.cancel()
-                guard let first = items.first?.date, let last = items.last?.date else { return }
-                let base = gestureBaseEnd ?? effectiveEnd
-                if gestureBaseEnd == nil { gestureBaseEnd = base }
-                let shift = Double(value.translation.width / max(width, 1)) * windowDays * 86_400
-                let lowerBound = first.addingTimeInterval(windowDays * 86_400 * 0.4)
-                endDate = min(last, max(lowerBound, base.addingTimeInterval(-shift)))
-            }
-            .onEnded { value in
-                holdTask?.cancel()
-                holdTask = nil
-                // Короткий тап без удержания — снять метку
-                if !markerHeld, abs(value.translation.width) < 6, abs(value.translation.height) < 6 {
-                    markedDate = nil
-                }
-                markerHeld = false
-                gestureBaseEnd = nil
-            }
-    }
-
-    private var zoomGesture: some Gesture {
-        MagnifyGesture()
-            .onChanged { value in
-                let base = gestureBaseWindow ?? windowDays
-                if gestureBaseWindow == nil { gestureBaseWindow = base }
-                windowDays = min(max(7, allDays), max(7, base / value.magnification))
-                // Держим метку по центру окна, если она поставлена
-                if let markedDate, let first = items.first?.date, let last = items.last?.date {
-                    let centered = markedDate.addingTimeInterval(windowDays * 86_400 / 2)
-                    let lowerBound = first.addingTimeInterval(windowDays * 86_400 * 0.4)
-                    endDate = min(last, max(lowerBound, centered))
-                }
-            }
-            .onEnded { _ in gestureBaseWindow = nil }
-    }
-
-    // MARK: - Итоги и список
-
     private var summarySection: some View {
-        let ws = visible.map(\.weightKg)
-        let change = (visible.count > 1) ? (visible.last!.weightKg - visible.first!.weightKg) : 0
+        let d = model.digest
         return Section("Итог за период") {
             LabeledContent("Изменение") {
-                Text("\(Fmt.signed(change)) кг")
-                    .foregroundStyle(palette.delta(change))
+                // Прочерк, а не «0,00 кг»: в окне без измерений менятьcя нечему.
+                Text(d.change.map { "\(Fmt.signed($0)) кг" } ?? "—")
+                    .foregroundStyle(d.change.map { palette.delta($0) } ?? Color.secondary)
             }
-            LabeledContent("Минимум", value: ws.min().map { "\(Fmt.n($0)) кг" } ?? "—")
-            LabeledContent("Максимум", value: ws.max().map { "\(Fmt.n($0)) кг" } ?? "—")
-            LabeledContent("Взвешиваний", value: "\(visible.count)")
+            LabeledContent("Минимум", value: d.lo.map { "\(Fmt.n($0)) кг" } ?? "—")
+            LabeledContent("Максимум", value: d.hi.map { "\(Fmt.n($0)) кг" } ?? "—")
+            LabeledContent("Взвешиваний", value: "\(d.count)")
         }
     }
 
     private var measurementsSection: some View {
-        let rows = Array(visible.reversed().prefix(18))
-        return Section {
-            ForEach(rows) { item in
-                Button { onOpenDay(item) } label: { measurementRow(item) }
+        Section {
+            ForEach(model.digest.rows) { p in
+                Button { open(p) } label: { row(p) }
                     .buttonStyle(.plain)
             }
         } header: {
             Text("Измерения")
         } footer: {
-            Text(visible.count > 18
-                 ? "Показаны последние 18 из \(visible.count) за период"
-                 : "\(visible.count) измерений за период")
+            Text(model.digest.count > 18
+                 ? "Показаны последние 18 из \(model.digest.count) за период"
+                 : "\(model.digest.count) измерений за период")
         }
     }
 
-    private func measurementRow(_ item: WeighIn) -> some View {
-        let d = delta(for: item)
-        let fat = item.fatPercent(for: settings.profile)
+    private func row(_ p: WeightPoint) -> some View {
+        // Дельта из готовой таблицы: прежде на КАЖДУЮ строку шёл линейный поиск
+        // по всей истории.
+        let d = model.snapshot.deltas[p.id]
         return HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 1) {
-                Text(Fmt.dayLabel(item.date))
-                Text(fat.map { "\(Fmt.time(item.date)) · жир \(Fmt.n($0, 1)) %" } ?? Fmt.time(item.date))
+                Text(Fmt.dayLabel(p.date))
+                Text(p.fat.map { "\(Fmt.time(p.date)) · жир \(Fmt.n($0, 1)) %" } ?? Fmt.time(p.date))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: 4)
-            Text(Fmt.n(item.weightKg))
+            Text(Fmt.n(p.kg))
                 .monospacedDigit()
             Text(d.map { Fmt.signed($0) } ?? "—")
                 .font(.subheadline.weight(.semibold))
@@ -371,8 +139,10 @@ struct HistoryView: View {
         .contentShape(Rectangle())
     }
 
-    private func delta(for item: WeighIn) -> Double? {
-        guard let idx = items.firstIndex(where: { $0.id == item.id }), idx > 0 else { return nil }
-        return item.weightKg - items[idx - 1].weightKg
+    /// Строка хранит СНИМОК, а не ссылку на объект хранилища: удалённая запись
+    /// иначе доживает до отрисовки. Настоящий объект ищем только по тапу.
+    private func open(_ p: WeightPoint) {
+        guard let item = items.first(where: { $0.persistentModelID == p.id }) else { return }
+        onOpenDay(item)
     }
 }

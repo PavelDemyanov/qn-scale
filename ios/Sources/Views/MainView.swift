@@ -13,20 +13,50 @@ struct MainView: View {
 
     private var stats: Stats { Stats(items: items, goal: settings.goalWeight) }
 
+    /// Снимок данных графика строится ОДИН раз на смену истории и раздаётся
+    /// вниз: обращения к объектам хранилища из тела кривой стоят дороже самой
+    /// отрисовки.
+    @State private var snapshot = WeightSnapshot.empty
+    @State private var snapshotVersion = 0
+
+    private struct SnapshotKey: Equatable {
+        var count: Int
+        var first: Date?
+        var last: Date?
+        var goal: Double
+        var forecast: Bool
+        var profile: Profile
+    }
+
+    private var key: SnapshotKey {
+        SnapshotKey(count: items.count, first: items.first?.date, last: items.last?.date,
+                    goal: settings.goalWeight, forecast: settings.showForecast,
+                    profile: settings.profile)
+    }
+
     var body: some View {
         Group {
             if items.isEmpty {
                 EmptyState(onManualAdd: onManualAdd)
             } else {
                 switch settings.mainLayout {
-                case .numbers: LayoutNumbers(stats: stats, items: items, onManualAdd: onManualAdd,
+                case .numbers: LayoutNumbers(stats: stats, items: items, snapshot: snapshot,
+                                             onManualAdd: onManualAdd,
                                              onGoal: onGoal, onOpenHistory: onOpenHistory)
-                case .chart:   LayoutChart(stats: stats, items: items, onGoal: onGoal, onOpenDay: onOpenDay)
+                case .chart:   LayoutChart(stats: stats, items: items, snapshot: snapshot,
+                                           onGoal: onGoal, onOpenDay: onOpenDay)
                 case .goal:    LayoutGoal(stats: stats, items: items, onManualAdd: onManualAdd, onGoal: onGoal)
                 }
             }
         }
         .padding(.bottom, 24)
+        .onChange(of: key, initial: true) { _, _ in
+            snapshotVersion &+= 1
+            snapshot = WeightSnapshot.build(items: items, profile: settings.profile,
+                                            goal: settings.goalWeight,
+                                            showForecast: settings.showForecast,
+                                            version: snapshotVersion)
+        }
     }
 }
 
@@ -54,6 +84,7 @@ private struct LayoutNumbers: View {
     @Environment(AppSettings.self) private var settings
     let stats: Stats
     let items: [WeighIn]
+    let snapshot: WeightSnapshot
     let onManualAdd: () -> Void
     let onGoal: () -> Void
     let onOpenHistory: () -> Void
@@ -112,7 +143,7 @@ private struct LayoutNumbers: View {
             }
             .cardInset()
 
-            SparkCard(stats: stats, items: items, onTap: onOpenHistory)
+            SparkCard(stats: stats, snapshot: snapshot, onTap: onOpenHistory)
 
             HStack(spacing: 11) {
                 StatTile(value: "\(items.count)", caption: "взвешиваний")
@@ -175,7 +206,7 @@ private struct SparkCard: View {
     @Environment(\.palette) private var palette
     @Environment(AppSettings.self) private var settings
     let stats: Stats
-    let items: [WeighIn]
+    let snapshot: WeightSnapshot
     let onTap: () -> Void
 
     private let height: CGFloat = 86
@@ -209,24 +240,19 @@ private struct SparkCard: View {
 
                 GeometryReader { proxy in
                     let size = CGSize(width: proxy.size.width, height: height)
-                    let inset = ChartGeometry.Padding(top: 5, bottom: 5, leading: 3, trailing: 3)
-                    let geo = ChartGeometry.build(
-                        items: items, goal: settings.goalWeight, windowDays: 30,
-                        endDate: stats.last?.date ?? Date(), size: size, padding: inset,
-                        forecastDays: settings.showForecast ? 9 : 0, slope: stats.slope)
-
-                    ZStack(alignment: .topLeading) {
-                        WeightChart(items: items, goal: settings.goalWeight, slope: stats.slope,
-                                    size: size, padding: inset, windowDays: 30,
-                                    endDate: stats.last?.date ?? Date(),
-                                    forecastFraction: 0.3,
-                                    showGoalLine: settings.showGoalLine,
-                                    showForecast: settings.showForecast,
-                                    lineWidth: 2.2)
-                        if let end = geo.lastPoint {
-                            ChartEndDot(point: end, ringColor: palette.card)
-                        }
-                    }
+                    WeightChart(snapshot: snapshot,
+                                window: snapshot.timeline.window(for: .d30),
+                                goal: settings.goalWeight, size: size,
+                                padding: .init(top: 5, bottom: 5, leading: 3, trailing: 3),
+                                // Цель втягиваем в кадр по тому же правилу, что
+                                // и на большом графике, а не безусловно.
+                                pullGoal: WeightPlot.goalFits(snapshot,
+                                                              window: snapshot.timeline.window(for: .d30),
+                                                              goal: settings.goalWeight,
+                                                              showForecast: settings.showForecast),
+                                showGoalLine: settings.showGoalLine,
+                                showForecast: settings.showForecast,
+                                endDotRing: palette.card, lineWidth: 2.2)
                 }
                 .frame(height: height)
 
@@ -252,7 +278,7 @@ private struct SparkCard: View {
     /// Дата первого измерения в окне 30 дней — подпись слева под спарклайном.
     private var firstVisibleLabel: String {
         let from = (stats.last?.date ?? Date()).addingTimeInterval(-30 * 86_400)
-        guard let first = items.first(where: { $0.date >= from }) else { return "" }
+        guard let first = snapshot.points.first(where: { $0.date >= from }) else { return "" }
         return Fmt.shortDayMonth(first.date)
     }
 }
@@ -264,16 +290,25 @@ private struct LayoutChart: View {
     @Environment(AppSettings.self) private var settings
     let stats: Stats
     let items: [WeighIn]
+    let snapshot: WeightSnapshot
     let onGoal: () -> Void
     let onOpenDay: (WeighIn) -> Void
 
-    @State private var window: Double = 30
+    /// Период — ЭНУМ, а не число суток: у тегов-`Double` «Всё» совпадало с
+    /// другим сегментом на короткой истории и менялось после каждого
+    /// взвешивания, отчего выбор слетал сам собой.
+    @State private var period: WeightPeriod = .d30
 
-    /// «Всё» — это вся история, а не условные десять лет: иначе данные сжимаются
-    /// в точку у правого края, а прогноз уезжает на треть этого срока вперёд.
-    private var allDays: Double {
-        guard let first = items.first?.date, let last = items.last?.date else { return 30 }
-        return max(7, last.timeIntervalSince(first) / 86_400 + 1)
+    /// На главном экране пресеты покрупнее, но и они показываются, только пока
+    /// означают разное (см. `WeightTimeline.availablePeriods`).
+    private var heroPeriods: [WeightPeriod] {
+        snapshot.timeline.availablePeriods.filter { $0 != .d7 }
+    }
+
+    /// Выбранный пресет мог исчезнуть из списка (история короче) — тогда
+    /// показываем всю историю, а не пустой переключатель.
+    private var effectivePeriod: WeightPeriod {
+        heroPeriods.contains(period) ? period : .all
     }
 
     var body: some View {
@@ -288,23 +323,15 @@ private struct LayoutChart: View {
     private var hero: some View {
         GeometryReader { proxy in
             let size = CGSize(width: proxy.size.width, height: 322)
-            let inset = ChartGeometry.Padding(top: 120, bottom: 64, leading: 0, trailing: 0)
-            let geo = ChartGeometry.build(
-                items: items, goal: settings.goalWeight, windowDays: window,
-                endDate: stats.last?.date ?? Date(), size: size, padding: inset,
-                forecastDays: settings.showForecast ? window * 0.3 : 0,
-                slope: stats.slope, includeGoal: false)
 
             ZStack(alignment: .topLeading) {
-                WeightChart(items: items, goal: settings.goalWeight, slope: stats.slope,
-                            size: size, padding: inset, windowDays: window,
-                            endDate: stats.last?.date ?? Date(),
-                            forecastFraction: 0.3, includeGoal: false,
-                            showGoalLine: false, showForecast: settings.showForecast,
-                            lineWidth: 2.4)
-                if let end = geo.lastPoint {
-                    ChartEndDot(point: end, ringColor: palette.bg)
-                }
+                WeightChart(snapshot: snapshot,
+                            window: snapshot.timeline.window(for: effectivePeriod),
+                            goal: settings.goalWeight, size: size,
+                            padding: .init(top: 120, bottom: 64, leading: 0, trailing: 0),
+                            pullGoal: false, showGoalLine: false,
+                            showForecast: settings.showForecast,
+                            endDotRing: palette.bg, lineWidth: 2.4)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(lastLabel)
@@ -334,10 +361,15 @@ private struct LayoutChart: View {
                 .padding(.leading, 20)
                 .padding(.top, 8)
 
-                Picker("Период", selection: $window) {
-                    Text("30 дней").tag(30.0)
-                    Text("3 месяца").tag(90.0)
-                    Text("Всё").tag(allDays)
+                // Читаем ДЕЙСТВУЮЩИЙ период: выбранный мог исчезнуть из списка
+                // на короткой истории, и переключатель стоял бы вовсе без
+                // выделения. Записываем по-прежнему в `period`, чтобы выбор
+                // вернулся сам, когда история дорастёт.
+                Picker("Период", selection: Binding(get: { effectivePeriod },
+                                                    set: { period = $0 })) {
+                    ForEach(heroPeriods) { p in
+                        Text(p == .d90 ? "3 месяца" : p.title).tag(p)
+                    }
                 }
                 .pickerStyle(.segmented)
                 .padding(.horizontal, 16)

@@ -1,123 +1,41 @@
 import SwiftUI
 
-/// Одна фигура графика. Все части (кривая, заливка, точки, пунктир) строятся
-/// из одних и тех же параметров окна, поэтому не расходятся между собой.
+/// Кривая веса целиком: заливка, линия, прогноз, линия цели, точки и, если
+/// нужно, точка «вы здесь» на конце.
 ///
-/// `animatableData` НЕТ намеренно: анимация окна (плавная смена периода и
-/// панорамирование) владельцу не понравилась и снята 12.08.2026 — график
-/// перерисовывается сразу, как было до неё.
-struct WeightCurve: Shape {
-    enum Kind { case line, lineSolid, lineGap, area, forecast, dots, goalLine }
-
-    let items: [WeighIn]
-    let goal: Double
-    let slope: Double?
-    let padding: ChartGeometry.Padding
-    let forecastFraction: Double
-    let includeGoal: Bool
-    let kind: Kind
-    var windowDays: Double
-    var endTime: TimeInterval
-
-    func geometry(in size: CGSize) -> ChartGeometry {
-        ChartGeometry.build(items: items, goal: goal,
-                            windowDays: max(1, windowDays),
-                            endDate: Date(timeIntervalSinceReferenceDate: endTime),
-                            size: size, padding: padding,
-                            forecastDays: max(1, windowDays) * forecastFraction,
-                            slope: slope, includeGoal: includeGoal)
-    }
-
-    func path(in rect: CGRect) -> Path {
-        let geo = geometry(in: rect.size)
-        switch kind {
-        case .line:      return geo.line
-        case .lineSolid: return geo.lineSolid
-        case .lineGap:   return geo.lineGap
-        case .area:      return geo.area
-        case .forecast:  return geo.forecast
-        case .dots:
-            var p = Path()
-            for sample in geo.samples {
-                p.addEllipse(in: CGRect(x: sample.point.x - 2.6, y: sample.point.y - 2.6,
-                                        width: 5.2, height: 5.2))
-            }
-            return p
-        case .goalLine:
-            var p = Path()
-            guard geo.goalInRange else { return p }
-            p.move(to: CGPoint(x: 0, y: geo.goalY))
-            p.addLine(to: CGPoint(x: rect.width - padding.trailing, y: geo.goalY))
-            return p
-        }
-    }
-}
-
-/// Кривая веса целиком: заливка, линия, прогноз, линия цели и точки.
+/// Геометрия строится ОДИН раз и здесь же отдаётся точке конца: раньше главный
+/// экран собирал её отдельно ради одного `lastPoint`, с параметрами,
+/// продублированными вручную в двух местах.
 struct WeightChart: View {
     @Environment(\.palette) private var palette
 
-    let items: [WeighIn]
+    let snapshot: WeightSnapshot
+    let window: ChartWindow
     let goal: Double
-    let slope: Double?
     let size: CGSize
-    let padding: ChartGeometry.Padding
-    let windowDays: Double
-    let endDate: Date
+    let padding: WeightPlot.Padding
 
-    var forecastFraction: Double = 0
-    var includeGoal = true
+    var pullGoal = true
     var showGoalLine = true
     var showForecast = true
     var showDots = false
+    var showAxis = false
+    var endDotRing: Color?
     var lineWidth: CGFloat = 2.3
 
-    private func curve(_ kind: WeightCurve.Kind) -> WeightCurve {
-        WeightCurve(items: items, goal: goal, slope: slope, padding: padding,
-                    forecastFraction: showForecast ? forecastFraction : 0,
-                    includeGoal: includeGoal, kind: kind,
-                    windowDays: windowDays,
-                    endTime: endDate.timeIntervalSinceReferenceDate)
-    }
-
-    /// Границы заливки — чтобы градиент гас у основания кривой, как в макете
-    /// (в SVG это objectBoundingBox), а не по всей высоте вью.
-    private var areaBounds: (top: CGFloat, bottom: CGFloat) {
-        let rect = curve(.area).path(in: CGRect(origin: .zero, size: size)).boundingRect
-        guard size.height > 0, !rect.isEmpty else { return (0, 1) }
-        return (max(0, rect.minY / size.height), min(1, rect.maxY / size.height))
-    }
-
     var body: some View {
-        let bounds = areaBounds
+        let plot = WeightPlot.build(snapshot, window: window, goal: goal,
+                                    pullGoal: pullGoal, showGoalLine: showGoalLine,
+                                    showForecast: showForecast, showDots: showDots,
+                                    size: size, padding: padding, niceScale: showAxis)
         ZStack(alignment: .topLeading) {
-            curve(.area)
-                .fill(LinearGradient(
-                    colors: [palette.blue.opacity(0.3), palette.blue.opacity(0)],
-                    startPoint: UnitPoint(x: 0.5, y: bounds.top),
-                    endPoint: UnitPoint(x: 0.5, y: bounds.bottom)))
-
-            if showGoalLine {
-                curve(.goalLine)
-                    .stroke(palette.green, style: StrokeStyle(lineWidth: 1.3, dash: [5, 4]))
-            }
-
-            if showForecast {
-                curve(.forecast)
-                    .stroke(palette.fg3, style: StrokeStyle(lineWidth: 1.9, lineCap: .round, dash: [3, 4]))
-            }
-
-            // Интерполяция — серым и тоньше: на этом отрезке взвешиваний
-            // не было, и выдавать домысел за данные нельзя.
-            curve(.lineGap)
-                .stroke(palette.fg3, style: StrokeStyle(lineWidth: lineWidth * 0.8,
-                                                        lineCap: .round, lineJoin: .round))
-
-            curve(.lineSolid)
-                .stroke(palette.blue, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round))
-
-            if showDots {
-                curve(.dots).fill(palette.blue)
+            WeightChartCanvas(plot: plot, palette: palette,
+                              markerX: nil, markerPoint: nil, markerHeld: false,
+                              showGoalLine: showGoalLine, showForecast: showForecast,
+                              showAxis: showAxis, lineWidth: lineWidth)
+                .equatable()
+            if let ring = endDotRing, let end = plot.lastPoint {
+                ChartEndDot(point: end, ringColor: ring)
             }
         }
         .frame(width: size.width, height: size.height)
