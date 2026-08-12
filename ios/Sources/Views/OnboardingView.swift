@@ -26,7 +26,7 @@ struct OnboardingView: View {
                 .font(.system(size: 30, weight: .bold))
                 .foregroundStyle(palette.fg)
             Text(bodyText)
-                .font(.system(size: 16))
+                .font(.body)
                 .lineSpacing(3)
                 .foregroundStyle(palette.fg2)
                 .padding(.top, 12)
@@ -131,25 +131,14 @@ struct OnboardingView: View {
             Row(title: "Желаемый вес", minHeight: 48) {
                 HStack(spacing: 12) {
                     Text("\(Fmt.n(settings.goalWeight, 1)) кг")
-                        .font(.system(size: 16))
                         .monospacedDigit()
                         .lineLimit(1)
                         .fixedSize()
                         .foregroundStyle(palette.fg2)
-                    HStack(spacing: 0) {
-                        Button { settings.goalWeight = max(40, settings.goalWeight - 0.5) } label: {
-                            Text("−").font(.system(size: 20)).foregroundStyle(palette.fg)
-                                .frame(width: 40, height: 30).contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        Rectangle().fill(palette.sep).frame(width: 0.5, height: 30)
-                        Button { settings.goalWeight = min(200, settings.goalWeight + 0.5) } label: {
-                            Text("+").font(.system(size: 18)).foregroundStyle(palette.fg)
-                                .frame(width: 40, height: 30).contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    .background(palette.seg, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    // Системный шаговик вместо самодельных «−» и «+»:
+                    // те же 0,5 кг, но с автоповтором и озвучкой VoiceOver.
+                    Stepper("Желаемый вес", value: $s.goalWeight, in: 40...200, step: 0.5)
+                        .labelsHidden()
                 }
             }
             RowSeparator()
@@ -172,10 +161,11 @@ struct OnboardingView: View {
         Row(title: label, minHeight: 48) {
             HStack(spacing: 8) {
                 Text(value)
-                    .font(.system(size: 16))
                     .monospacedDigit()
                     .foregroundStyle(palette.fg2)
-                Chevron()
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.tertiary)
             }
         }
     }

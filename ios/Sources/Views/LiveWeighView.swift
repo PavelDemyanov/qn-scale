@@ -98,21 +98,21 @@ struct LiveWeighView: View {
             VStack(spacing: 0) {
                 Row(title: "С прошлого раза", minHeight: 48) {
                     Text(delta.map { "\(Fmt.signed($0)) кг" } ?? "первое измерение")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.body.weight(.semibold))
                         .monospacedDigit()
                         .foregroundStyle(delta.map { palette.delta($0) } ?? palette.fg2)
                 }
                 RowSeparator()
                 Row(title: "Жир", minHeight: 48) {
                     Text(fat.map { "\(Fmt.n($0, 1)) %" } ?? "—")
-                        .font(.system(size: 16, weight: .medium))
+                        .font(.body.weight(.medium))
                         .monospacedDigit()
                         .foregroundStyle(palette.fg2)
                 }
                 RowSeparator()
                 Row(title: "Импеданс", minHeight: 48) {
                     Text("\(reading.impedance1) / \(reading.impedance2) Ом")
-                        .font(.system(size: 16, weight: .medium))
+                        .font(.body.weight(.medium))
                         .monospacedDigit()
                         .foregroundStyle(palette.fg2)
                 }

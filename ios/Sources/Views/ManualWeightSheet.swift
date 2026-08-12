@@ -20,59 +20,52 @@ struct ManualWeightSheet: View {
 
     var body: some View {
         NavigationStack {
-        VStack(spacing: 0) {
-            HStack(alignment: .lastTextBaseline, spacing: 7) {
-                TextField(lastWeight.map { Fmt.n($0) } ?? "0,00", text: $text)
-                    .font(.system(size: 56, weight: .semibold))
-                    .monospacedDigit()
-                    .keyboardType(.decimalPad)
-                    .multilineTextAlignment(.trailing)
-                    .fixedSize()
-                    .focused($focused)
-                Text("кг")
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(palette.fg2)
-            }
-            .padding(.top, 24)
+            Form {
+                Section {
+                    HStack(alignment: .lastTextBaseline, spacing: 7) {
+                        Spacer(minLength: 0)
+                        TextField(lastWeight.map { Fmt.n($0) } ?? "0,00", text: $text)
+                            .font(.system(size: 56, weight: .semibold))
+                            .monospacedDigit()
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                            .fixedSize()
+                            .focused($focused)
+                        Text("кг")
+                            .font(.title3.weight(.medium))
+                            .foregroundStyle(.secondary)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.vertical, 6)
+                }
+                .listRowBackground(Color.clear)
 
-            VStack(spacing: 0) {
-                Row(title: "Когда", minHeight: 52) {
-                    DatePicker("", selection: $date, in: ...Date())
-                        .labelsHidden()
+                Section {
+                    DatePicker("Когда", selection: $date, in: ...Date())
+                } footer: {
+                    Text("Импеданса у такой записи нет, поэтому процент жира для неё не считается.")
                 }
             }
-            .sheetCard(radius: 20)
-            .cardInset()
-            .padding(.top, 26)
-
-            Text("Импеданса у такой записи нет, поэтому процент жира для неё не считается.")
-                .font(.system(size: 12))
-                .lineSpacing(4)
-                .multilineTextAlignment(.center)
-                .foregroundStyle(palette.fg3)
-                .padding(.horizontal, 36)
-                .padding(.top, 12)
-
-            Spacer()
-
-            ActionButton(title: "Сохранить") {
-                if let weight {
-                    onSave(weight, date)
-                    dismiss()
+            .scrollDismissesKeyboard(.interactively)
+            .navigationTitle("Вес вручную")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Отмена") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Сохранить") {
+                        if let weight {
+                            onSave(weight, date)
+                            dismiss()
+                        }
+                    }
+                    .disabled(weight == nil)
+                }
+                // Цифровая клавиатура без «Готово» не убирается — кнопка обязана быть.
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Готово") { focused = false }
                 }
             }
-            .disabled(weight == nil)
-            .padding(.horizontal, 16)
-            .padding(.bottom, 34)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(palette.sheet)
-        .ignoresSafeArea(edges: .bottom)
-        .navigationTitle("Вес вручную")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) { Button("Отмена") { dismiss() } }
-        }
         }
         .onAppear { focused = true }
     }

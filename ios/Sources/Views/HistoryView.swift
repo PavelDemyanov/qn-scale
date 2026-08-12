@@ -232,7 +232,7 @@ struct HistoryView: View {
                 .font(.system(size: 11))
                 .foregroundStyle(palette.fg2)
             Text("\(Fmt.n(item.weightKg)) кг")
-                .font(.system(size: 16, weight: .semibold))
+                .font(.body.weight(.semibold))
                 .monospacedDigit()
                 .foregroundStyle(palette.fg)
             Text(d.map { "\(Fmt.signed($0)) кг" } ?? "первое")

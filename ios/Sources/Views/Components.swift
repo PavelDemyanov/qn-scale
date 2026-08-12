@@ -62,7 +62,9 @@ struct RowSeparator: View {
     }
 }
 
-/// Строка сгруппированного списка.
+/// Строка внутри карточки. Внутри — системный `LabeledContent`: он сам даёт
+/// правильные шрифты, поддержку крупного текста и связку «подпись — значение»
+/// для VoiceOver; своё здесь только выравнивание по карточке.
 struct Row<Trailing: View>: View {
     @Environment(\.palette) private var palette
     let title: String
@@ -72,19 +74,11 @@ struct Row<Trailing: View>: View {
     @ViewBuilder var trailing: Trailing
 
     var body: some View {
-        HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.system(size: 16))
-                    .foregroundStyle(titleColor ?? palette.fg)
-                if let subtitle {
-                    Text(subtitle)
-                        .font(.system(size: 12))
-                        .foregroundStyle(palette.fg3)
-                }
-            }
-            Spacer(minLength: 8)
+        LabeledContent {
             trailing
+        } label: {
+            Text(title).foregroundStyle(titleColor ?? palette.fg)
+            if let subtitle { Text(subtitle) }
         }
         .padding(.horizontal, 18)
         .frame(minHeight: minHeight)

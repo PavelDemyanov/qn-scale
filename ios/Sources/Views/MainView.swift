@@ -146,7 +146,7 @@ private struct LayoutNumbers: View {
                         : [], id: \.0) { days, label in
                     Row(title: label, minHeight: 41) {
                         Text(stats.forecast(days: days).map { "\(Fmt.n($0)) кг" } ?? "—")
-                            .font(.system(size: 16, weight: .medium))
+                            .font(.body.weight(.medium))
                             .monospacedDigit()
                             .foregroundStyle(palette.fg2)
                     }
@@ -158,7 +158,7 @@ private struct LayoutNumbers: View {
                         Text(settings.showForecast
                              ? stats.goalDateLabel
                              : (stats.toGoal.map { "\(Fmt.n($0)) кг" } ?? "—"))
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(.body.weight(.semibold))
                             .foregroundStyle(palette.green)
                     }
                 }
@@ -439,7 +439,7 @@ private struct LayoutChart: View {
                         Row(title: Fmt.dayLabel(item.date), minHeight: 48) {
                             HStack(spacing: 12) {
                                 Text(Fmt.n(item.weightKg))
-                                    .font(.system(size: 16, weight: .medium))
+                                    .font(.body.weight(.medium))
                                     .monospacedDigit()
                                     .foregroundStyle(palette.fg)
                                 Text(deltaString(for: item))
@@ -539,7 +539,7 @@ private struct LayoutGoal: View {
                         .monospacedDigit()
                         .foregroundStyle(palette.fg)
                     Text("кг")
-                        .font(.system(size: 16, weight: .medium))
+                        .font(.body.weight(.medium))
                         .foregroundStyle(palette.fg2)
                 }
                 if let day = stats.dayDelta {

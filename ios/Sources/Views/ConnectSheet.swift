@@ -137,12 +137,8 @@ struct ConnectSheet: View {
                 .compactMap { $0 }.joined(separator: " · "),
             minHeight: 58) {
             Button("Выбрать") { scale.confirmPairing() }
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 7)
-                .background(palette.blue, in: Capsule())
-                .buttonStyle(.plain)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
         }
         .sheetCard(radius: 20)
         .cardInset()
@@ -163,20 +159,21 @@ struct ConnectSheet: View {
     }
 
     private func stepRow(_ label: String, _ code: String, _ done: Bool) -> some View {
-        HStack(spacing: 0) {
-            Text(done ? "✓" : "·")
-                .font(.system(size: 15))
+        // Галочка и «ещё не сделано» — системными символами, а не значками
+        // из текста: они сами тянутся за размером шрифта.
+        Label {
+            HStack {
+                Text(label).foregroundStyle(palette.fg)
+                Spacer()
+                Text(code)
+                    .font(.caption2.monospaced())
+                    .foregroundStyle(palette.fg3)
+            }
+        } icon: {
+            Image(systemName: done ? "checkmark.circle.fill" : "circle.dotted")
                 .foregroundStyle(done ? palette.green : palette.fg3)
-                .frame(width: 22, alignment: .leading)
-            Text(label)
-                .font(.system(size: 15))
-                .foregroundStyle(palette.fg)
-            Spacer()
-            Text(code)
-                .font(.system(size: 12))
-                .monospaced()
-                .foregroundStyle(palette.fg3)
         }
+        .font(.subheadline)
         .padding(.horizontal, 18)
         .frame(minHeight: 44)
     }

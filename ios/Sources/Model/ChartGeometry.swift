@@ -154,10 +154,20 @@ struct ChartGeometry {
             }
         }
 
+        // Заливку строим ОДНИМ непрерывным контуром по тем же кривым: у `line`
+        // каждый отрезок — свой подпуть со своим `move`, и основание достаётся
+        // только последнему из них, отчего заливка вырождалась в клин.
         var area = Path()
         if let first = pts.first, let last = pts.last {
-            area = line
             let base = size.height - padding.bottom
+            area.move(to: first)
+            for seg in segments {
+                if let c1 = seg.c1, let c2 = seg.c2 {
+                    area.addCurve(to: seg.to, control1: c1, control2: c2)
+                } else {
+                    area.addLine(to: seg.to)
+                }
+            }
             area.addLine(to: CGPoint(x: last.x, y: base))
             area.addLine(to: CGPoint(x: first.x, y: base))
             area.closeSubpath()
@@ -185,23 +195,34 @@ struct ChartGeometry {
     /// возвращается своим путём, чтобы интерполированные участки можно было
     /// закрасить отдельно. Контрольные точки по-прежнему смотрят на соседей,
     /// поэтому склейка отрезков даёт ту же гладкую кривую, что и раньше.
-    private static func smoothSegments(_ p: [CGPoint]) -> [(path: Path, from: CGPoint, to: CGPoint)] {
+    /// Отрезок кривой: готовый путь для обводки и его же контрольные точки —
+    /// по ним заливка собирается одним непрерывным контуром.
+    private struct Segment {
+        let path: Path
+        let from: CGPoint
+        let to: CGPoint
+        let c1: CGPoint?
+        let c2: CGPoint?
+    }
+
+    private static func smoothSegments(_ p: [CGPoint]) -> [Segment] {
         guard p.count > 1 else { return [] }
-        var out: [(Path, CGPoint, CGPoint)] = []
+        var out: [Segment] = []
         for i in 0..<(p.count - 1) {
             let p1 = p[i], p2 = p[i + 1]
             var seg = Path()
             seg.move(to: p1)
             if p.count < 3 {
                 seg.addLine(to: p2)
+                out.append(Segment(path: seg, from: p1, to: p2, c1: nil, c2: nil))
             } else {
                 let p0 = i > 0 ? p[i - 1] : p[i]
                 let p3 = i + 2 < p.count ? p[i + 2] : p[i + 1]
                 let c1 = CGPoint(x: p1.x + (p2.x - p0.x) / 8, y: p1.y + (p2.y - p0.y) / 8)
                 let c2 = CGPoint(x: p2.x - (p3.x - p1.x) / 8, y: p2.y - (p3.y - p1.y) / 8)
                 seg.addCurve(to: p2, control1: c1, control2: c2)
+                out.append(Segment(path: seg, from: p1, to: p2, c1: c1, c2: c2))
             }
-            out.append((seg, p1, p2))
         }
         return out
     }

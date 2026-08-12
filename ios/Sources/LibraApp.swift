@@ -79,11 +79,6 @@ struct RootView: View {
     /// (шторка поиска начинается в 120 пунктах от верха, импорт — в 150, день — в 300).
     @State private var screenHeight: CGFloat = 874
 
-    /// Высота шторки дня — по её содержимому (меряется при показе). Стартовое
-    /// значение близко к настоящему, чтобы первое открытие не подпрыгивало;
-    /// дальше оно уточняется само и живёт до конца сеанса.
-    @State private var daySheetHeight: CGFloat = 420
-
     private func sheetHeight(topInset: CGFloat) -> CGFloat {
         max(320, screenHeight - topInset)
     }
@@ -142,8 +137,9 @@ struct RootView: View {
             ManualWeightSheet(lastWeight: items.last?.weightKg) { weight, date in
                 addManual(weight: weight, date: date)
             }
-            .presentationDetents([.height(sheetHeight(topInset: 150))])
-            .presentationCornerRadius(22)
+            // Форма короткая — системный средний детент по ней и сидит,
+            // а не растягивает шторку почти во весь экран пустотой.
+            .presentationDetents([.medium, .large])
         }
         .sheet(item: $sheet) { which in
             switch which {
@@ -159,9 +155,8 @@ struct RootView: View {
         }
         .sheet(item: $selectedDay) { item in
             DaySheet(item: item, delta: delta(for: item)) { delete(item) }
-                .measuringSheetHeight($daySheetHeight)
-                .presentationDetents([.height(daySheetHeight)])
-                .presentationCornerRadius(22)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
     }
 
