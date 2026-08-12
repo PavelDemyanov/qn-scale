@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Общие кирпичики из макета: карточки, строки списков, сегменты, кнопки.
+/// Общие кирпичики из макета: карточки, строки, кнопки и плитки. Всё, чему
+/// нашлась системная замена (сегменты, шевроны, заголовки экранов), убрано.
 
 struct CardBackground: ViewModifier {
     @Environment(\.palette) private var palette
@@ -40,21 +41,6 @@ struct SectionHeader: View {
     }
 }
 
-/// Пояснение под группой.
-struct SectionFooter: View {
-    @Environment(\.palette) private var palette
-    let text: String
-    var body: some View {
-        Text(text)
-            .font(.system(size: 12))
-            .lineSpacing(4)   // line-height 1.4 из макета
-            .foregroundStyle(palette.fg3)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 36)
-            .padding(.top, 7)
-    }
-}
-
 struct RowSeparator: View {
     @Environment(\.palette) private var palette
     var body: some View {
@@ -78,7 +64,10 @@ struct Row<Trailing: View>: View {
             trailing
         } label: {
             Text(title).foregroundStyle(titleColor ?? palette.fg)
-            if let subtitle { Text(subtitle) }
+            // Подпись может занять две строки: длинную «−0,50 кг в неделю»
+            // системный `LabeledContent` иначе выдавливает вбок и режет
+            // значение справа.
+            if let subtitle { Text(subtitle).lineLimit(2) }
         }
         .padding(.horizontal, 18)
         .frame(minHeight: minHeight)
@@ -90,46 +79,6 @@ extension Row where Trailing == EmptyView {
     init(title: String, subtitle: String? = nil, minHeight: CGFloat = 52, titleColor: Color? = nil) {
         self.init(title: title, subtitle: subtitle, minHeight: minHeight,
                   titleColor: titleColor, trailing: { EmptyView() })
-    }
-}
-
-struct Chevron: View {
-    @Environment(\.palette) private var palette
-    var body: some View {
-        Image(systemName: "chevron.right")
-            .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(palette.fg3)
-    }
-}
-
-/// Сегментированный переключатель из макета (свой, а не системный: у системного
-/// другой радиус и другая типографика).
-struct Segmented<T: Hashable>: View {
-    @Environment(\.palette) private var palette
-    let items: [(value: T, label: String)]
-    @Binding var selection: T
-    var fontSize: CGFloat = 13
-    var selectedBackground: Color? = nil
-
-    var body: some View {
-        HStack(spacing: 3) {
-            ForEach(items, id: \.value) { item in
-                let on = item.value == selection
-                Text(item.label)
-                    .font(.system(size: fontSize, weight: on ? .semibold : .regular))
-                    .foregroundStyle(on ? palette.fg : palette.fg2)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 7)
-                    .background(on ? (selectedBackground ?? palette.card) : .clear,
-                                in: RoundedRectangle(cornerRadius: 7, style: .continuous))
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        withAnimation(.snappy(duration: 0.22)) { selection = item.value }
-                    }
-            }
-        }
-        .padding(2)
-        .background(palette.seg, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
     }
 }
 
@@ -160,30 +109,6 @@ struct ActionButton: View {
                 .controlSize(.large)
                 .frame(maxWidth: .infinity)
         }
-    }
-}
-
-/// Маленькая плитка со значением: «взвешиваний», «дней подряд» и т. п.
-struct StatTile: View {
-    @Environment(\.palette) private var palette
-    let value: String
-    let caption: String
-    var valueColor: Color? = nil
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(value)
-                .font(.system(size: 20, weight: .semibold))
-                .monospacedDigit()
-                .foregroundStyle(valueColor ?? palette.fg)
-            Text(caption)
-                .font(.system(size: 12))
-                .foregroundStyle(palette.fg2)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 13)
-        .padding(.vertical, 9)
-        .card(radius: 18)
     }
 }
 
@@ -231,41 +156,5 @@ struct ScaleDialIcon: View {
             Circle().frame(width: 5.6 * k, height: 5.6 * k)
         }
         .frame(width: size, height: size)
-    }
-}
-
-/// Заголовок экрана в стиле крупного iOS-заголовка.
-struct LargeTitle: View {
-    @Environment(\.palette) private var palette
-    let text: String
-    var body: some View {
-        Text(text)
-            .font(.system(size: 34, weight: .bold))
-            .foregroundStyle(palette.fg)
-    }
-}
-
-/// Высота содержимого шторки. Детент `.height(экран − отступ)` оставлял под
-/// коротким содержимым пустое поле (жалоба владельца 12.08.2026); теперь
-/// шторка ровно по контенту.
-struct SheetContentHeightKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = max(value, nextValue())
-    }
-}
-
-extension View {
-    /// Померить собственную высоту и отдать её наружу — для `.presentationDetents`.
-    func measuringSheetHeight(_ height: Binding<CGFloat>) -> some View {
-        background(
-            GeometryReader { g in
-                Color.clear.preference(key: SheetContentHeightKey.self, value: g.size.height)
-            }
-        )
-        .onPreferenceChange(SheetContentHeightKey.self) { h in
-            // Ноль приходит на разборке вью — им детент портить нельзя.
-            if h > 1 { height.wrappedValue = h }
-        }
     }
 }

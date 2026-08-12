@@ -155,7 +155,9 @@ struct RootView: View {
         }
         .sheet(item: $selectedDay) { item in
             DaySheet(item: item, delta: delta(for: item)) { delete(item) }
-                .presentationDetents([.medium, .large])
+                // Не `.medium`: на половине экрана «Удалить измерение» уходило
+                // за нижний край, и кнопку было видно только прокруткой.
+                .presentationDetents([.fraction(0.62), .large])
                 .presentationDragIndicator(.visible)
         }
     }

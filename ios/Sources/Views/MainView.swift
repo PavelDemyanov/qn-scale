@@ -145,13 +145,10 @@ private struct LayoutNumbers: View {
 
             SparkCard(stats: stats, snapshot: snapshot, onTap: onOpenHistory)
 
-            HStack(spacing: 11) {
-                StatTile(value: "\(items.count)", caption: "взвешиваний")
-                StatTile(value: "\(stats.daysWithScale)", caption: "дней с весами")
-                StatTile(value: "\(stats.streak)", caption: "дней подряд")
-            }
-            .cardInset()
-            .padding(.top, 2)
+            // Те же столбики недели, что и в компоновке «Цель»: по ним видно,
+            // как прошла именно ЭТА неделя, а счётчики «дней с весами» и
+            // «дней подряд» об этом не говорили ничего.
+            WeekBarsCard(stats: stats)
 
             forecastSection
         }
@@ -165,7 +162,7 @@ private struct LayoutNumbers: View {
 
     private var goalSubtitle: String {
         guard settings.showForecast else { return "осталось до цели" }
-        return stats.ratePerWeek.map { "темп \(Fmt.signed($0)) кг/нед" } ?? "темп пока не посчитать"
+        return stats.ratePerWeek.map { "\(Fmt.signed($0)) кг в неделю" } ?? "темп пока не посчитать"
     }
 
     private var forecastSection: some View {
@@ -185,12 +182,18 @@ private struct LayoutNumbers: View {
                 }
                 Button(action: onGoal) {
                     Row(title: "Цель \(Fmt.n(settings.goalWeight, 1)) кг",
-                        subtitle: goalSubtitle, minHeight: 45) {
+                        subtitle: goalSubtitle, minHeight: 52) {
+                        // Дата достижения цели — главное в строке, и ужиматься
+                        // она не должна: подпись про темп длинная, и без
+                        // приоритета «2 октября» обрезалось до «…ября».
                         Text(settings.showForecast
                              ? stats.goalDateLabel
                              : (stats.toGoal.map { "\(Fmt.n($0)) кг" } ?? "—"))
                             .font(.body.weight(.semibold))
                             .foregroundStyle(palette.green)
+                            .lineLimit(1)
+                            .fixedSize()
+                            .layoutPriority(1)
                     }
                 }
                 .buttonStyle(.plain)
@@ -519,7 +522,7 @@ private struct LayoutGoal: View {
     var body: some View {
         VStack(spacing: 13) {
             ring
-            weekBars
+            WeekBarsCard(stats: stats)
             if settings.showForecast { forecastCard }
 
             HStack(spacing: 11) {
@@ -615,58 +618,6 @@ private struct LayoutGoal: View {
         return Fmt.dayLabel(last.date) + ", " + Fmt.time(last.date)
     }
 
-    private var weekBars: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text("Последние 7 дней")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(palette.fg)
-                Spacer()
-                Text("кг за день")
-                    .font(.system(size: 12))
-                    .foregroundStyle(palette.fg2)
-            }
-            .padding(.horizontal, 4)
-            .padding(.bottom, 12)
-
-            HStack(alignment: .bottom, spacing: 6) {
-                ForEach(stats.lastSevenDays) { bar in
-                    VStack(spacing: 6) {
-                        Spacer(minLength: 0)
-                        Text(bar.delta.map { Fmt.signed($0, 1) } ?? "—")
-                            .font(.system(size: 11, weight: .semibold))
-                            .monospacedDigit()
-                            .foregroundStyle(bar.delta.map { palette.delta($0) } ?? palette.fg3)
-                        RoundedRectangle(cornerRadius: 5)
-                            .fill(barColor(bar.delta))
-                            .frame(height: barHeight(bar.delta))
-                        Text(bar.weekday)
-                            .font(.system(size: 11))
-                            .textCase(.uppercase)
-                            .foregroundStyle(palette.fg3)
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-            }
-            .frame(height: 104)
-        }
-        .padding(.horizontal, 14)
-        .padding(.top, 16)
-        .padding(.bottom, 12)
-        .card()
-        .cardInset()
-    }
-
-    private func barHeight(_ delta: Double?) -> CGFloat {
-        guard let delta else { return 4 }
-        return max(5, min(58, abs(delta) * 62))
-    }
-
-    private func barColor(_ delta: Double?) -> Color {
-        guard let delta else { return palette.card2 }
-        return delta < -0.0049 ? palette.green : delta > 0.0049 ? palette.orange : palette.fg3
-    }
-
     private var forecastCard: some View {
         Button(action: onGoal) {
             VStack(alignment: .leading, spacing: 0) {
@@ -714,5 +665,70 @@ private struct LayoutGoal: View {
             return "Цель \(Fmt.n(settings.goalWeight, 1)) кг — темп пока не посчитать"
         }
         return "Если темп сохранится, \(Fmt.n(settings.goalWeight, 1)) кг будет \(stats.goalDateLabel)"
+    }
+}
+
+// MARK: - Столбики недели
+
+/// Дельты по дням ТЕКУЩЕЙ недели, понедельник — воскресенье.
+///
+/// Одна карточка на две компоновки: «Числа» и «Цель» рисовали бы одно и то же
+/// двумя копиями кода, и они бы разошлись на первой правке.
+private struct WeekBarsCard: View {
+    @Environment(\.palette) private var palette
+    let stats: Stats
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("Эта неделя")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(palette.fg)
+                Spacer()
+                Text("кг за день")
+                    .font(.system(size: 12))
+                    .foregroundStyle(palette.fg2)
+            }
+            .padding(.horizontal, 4)
+            .padding(.bottom, 12)
+
+            HStack(alignment: .bottom, spacing: 6) {
+                ForEach(stats.currentWeek) { bar in
+                    VStack(spacing: 6) {
+                        Spacer(minLength: 0)
+                        // У будущего дня не «нет данных», а «ещё не наступил»:
+                        // прочерк тут читался бы как пропущенное взвешивание.
+                        Text(bar.isFuture ? " " : (bar.delta.map { Fmt.signed($0, 1) } ?? "—"))
+                            .font(.system(size: 11, weight: .semibold))
+                            .monospacedDigit()
+                            .foregroundStyle(bar.delta.map { palette.delta($0) } ?? palette.fg3)
+                        RoundedRectangle(cornerRadius: 5)
+                            .fill(barColor(bar))
+                            .frame(height: barHeight(bar))
+                        Text(bar.weekday)
+                            .font(.system(size: 11, weight: bar.isToday ? .semibold : .regular))
+                            .textCase(.uppercase)
+                            .foregroundStyle(bar.isToday ? palette.fg : palette.fg3)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+            .frame(height: 104)
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 16)
+        .padding(.bottom, 12)
+        .card()
+        .cardInset()
+    }
+
+    private func barHeight(_ bar: Stats.DayBar) -> CGFloat {
+        guard let delta = bar.delta else { return bar.isFuture ? 2 : 4 }
+        return max(5, min(58, abs(delta) * 62))
+    }
+
+    private func barColor(_ bar: Stats.DayBar) -> Color {
+        guard let delta = bar.delta else { return bar.isFuture ? palette.seg : palette.card2 }
+        return delta < -0.0049 ? palette.green : delta > 0.0049 ? palette.orange : palette.fg3
     }
 }

@@ -121,23 +121,42 @@ struct Stats {
         return min(max((start - last.weightKg) / total, 0), 1)
     }
 
-    /// Дельта каждого из последних семи календарных дней — для столбиков.
+    /// День недели со своей дельтой — для столбиков.
     struct DayBar: Identifiable {
+        /// 0 — понедельник.
         let id: Int
         let weekday: String
+        let date: Date
         let delta: Double?
+        /// День ещё не наступил: столбика нет и не будет до самого дня.
+        let isFuture: Bool
+        let isToday: Bool
     }
 
-    var lastSevenDays: [DayBar] {
-        let cal = Calendar.current
-        return (0..<7).reversed().map { back -> DayBar in
-            let date = cal.date(byAdding: .day, value: -back, to: cal.startOfDay(for: Date())) ?? Date()
+    /// Дельты по дням ТЕКУЩЕЙ недели, с понедельника по воскресенье.
+    ///
+    /// Именно календарная неделя, а не «последние семь дней»: скользящее окно
+    /// каждый день переставляет подписи, и понедельник оказывается то слева,
+    /// то в середине — по такой картинке нельзя сказать «в эту среду было».
+    /// Понедельник задан ЯВНО, а не первым днём локали: в части локалей неделя
+    /// начинается с воскресенья, а просили пн — вс.
+    var currentWeek: [DayBar] {
+        var cal = Calendar.current
+        cal.firstWeekday = 2
+        let today = cal.startOfDay(for: Date())
+        guard let monday = cal.dateInterval(of: .weekOfYear, for: today)?.start else { return [] }
+        return (0..<7).map { i -> DayBar in
+            let date = cal.date(byAdding: .day, value: i, to: monday) ?? monday
             let weekday = date.formatted(.dateTime.weekday(.abbreviated))
+            let future = date > today
+            let isToday = cal.isDate(date, inSameDayAs: today)
             guard let idx = items.firstIndex(where: { cal.isDate($0.date, inSameDayAs: date) }) else {
-                return DayBar(id: back, weekday: weekday, delta: nil)
+                return DayBar(id: i, weekday: weekday, date: date, delta: nil,
+                              isFuture: future, isToday: isToday)
             }
             let delta = idx > 0 ? items[idx].weightKg - items[idx - 1].weightKg : 0
-            return DayBar(id: back, weekday: weekday, delta: delta)
+            return DayBar(id: i, weekday: weekday, date: date, delta: delta,
+                          isFuture: future, isToday: isToday)
         }
     }
 }
