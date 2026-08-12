@@ -31,6 +31,10 @@ targets:
         PRODUCT_NAME: Libra
         TARGETED_DEVICE_FAMILY: "1"
         GENERATE_INFOPLIST_FILE: YES
+        # Своего шифрования в приложении нет — без этого ключа TestFlight
+        # спрашивает про экспортное соответствие у каждой сборки.
+        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_KEY_CFBundleDisplayName: QN Scale
         # Иначе системные элементы (например, выбор даты) остаются на английском
         INFOPLIST_KEY_CFBundleDevelopmentRegion: ru

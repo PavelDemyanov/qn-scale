@@ -1,0 +1,32 @@
+{
+  "_комментарий": "Тексты витрины App Store. Потолки Apple: описание 4000, ключевые слова 100, промо 170, подзаголовок 30, имя 30. Проверяются перед отправкой в tools/asc/apply_copy.py.",
+
+  "name": "QN Scale",
+  "subtitleRu": "Умные весы без облака",
+  "subtitleEn": "Smart scale, no cloud",
+
+  "promoRu": "Весы, которые не просят аккаунт: приложение говорит с ними напрямую, а история остаётся на вашем iPhone.",
+  "promoEn": "A scale app that never asks for an account: it talks to the scale directly and keeps your history on your iPhone.",
+
+  "keywordsRu": "весы,вес,похудение,жир,импеданс,здоровье,bluetooth,qingniu,yolanda,график,цель,имт",
+  "keywordsEn": "scale,weight,body fat,impedance,bmi,bluetooth,qingniu,yolanda,tracker,goal,trend",
+
+  "descriptionRu": "QN Scale — приложение для напольных весов, которые общаются по протоколу QN. Такие весы продают под марками Qingniu, Yolanda и десятком других имён; в эфире они обычно называются QN-Scale.\n\nНаступили на весы — вес уже записан. Весы находятся один раз, дальше приложение подключается к ним само, пока телефон просто лежит рядом.\n\n• График, который слушается пальца: протяжка, щипок и полоса-обзор под кривой. Задержали палец — метка с датой, весом и разницей с прошлым разом.\n• Периоды 7, 30 и 90 дней или вся история целиком.\n• Состав тела: весы измеряют импеданс, приложение считает по нему процент жира. Есть поправка — если вы доверяете другому результату больше.\n• Цель линией на графике и прогноз по темпу последних тридцати дней, с датой, когда цель будет достигнута.\n• «Здоровье»: вес, процент жира и ИМТ уходят туда с вашего разрешения, а историю можно и загрузить обратно — дубликаты приложение отсеет само.\n• Напоминание взвеситься приходит только в тот день, когда вы ещё не вставали на весы.\n• Русский и английский переключаются прямо в приложении, вместе с форматом дат и чисел.\n\nДанные никуда не уходят. У приложения нет сервера, учётных записей, аналитики и сторонних библиотек — в его коде нет ни одного сетевого вызова. Взвешивания лежат на вашем iPhone, а Bluetooth используется только для разговора с весами.\n\nПроцент жира — оценка по импедансу, а не измерение: формулы у всех производителей свои и закрытые. Смотрите на движение цифры со временем, а не на её абсолютное значение. Приложение не является медицинским прибором и не заменяет врача.",
+
+  "descriptionEn": "QN Scale is an app for bathroom scales that speak the QN protocol. Such scales are sold under the Qingniu, Yolanda and a dozen other names; on the air they usually appear as QN-Scale.\n\nStep on the scale and your weight is already recorded. You find the scale once — after that the app connects on its own while the phone simply lies nearby.\n\n• A chart that follows your finger: pan, pinch and an overview slider under the curve. Press and hold for a marker with the date, the weight and the change since last time.\n• 7, 30 and 90 days, or your whole history at once.\n• Body composition: the scale measures impedance and the app estimates body fat from it. There is an offset — for when you trust another result more.\n• A goal line on the chart and a forecast from the rate of the last thirty days, with the date the goal is reached.\n• Apple Health: weight, body fat and BMI go there with your permission, and you can import your history back — duplicates are filtered out.\n• The weigh-in reminder arrives only on days when you haven't stepped on the scale yet.\n• Russian and English switch inside the app, together with date and number formats.\n\nYour data goes nowhere. The app has no server, no accounts, no analytics and no third-party SDKs — there is not a single network call in its code. Weigh-ins stay on your iPhone, and Bluetooth is used only to talk to the scale.\n\nBody fat is an estimate from impedance, not a measurement: every manufacturer keeps its own closed formula. Watch how the number moves over time rather than its absolute value. The app is not a medical device and is not a substitute for a doctor.",
+
+  "supportUrl": "https://qn-scale.vercel.app/support",
+  "marketingUrl": "https://qn-scale.vercel.app",
+  "privacyPolicyUrl": "https://qn-scale.vercel.app/privacy",
+  "copyright": "2026 Pavel Demianov",
+
+  "primaryCategory": "HEALTH_AND_FITNESS",
+  "secondaryCategory": "UTILITIES",
+  "price": "free",
+  "ageRating": "4+",
+
+  "_приватность": "Анкета конфиденциальности — «Data Not Collected»: приложение не собирает и не передаёт ничего, данные HealthKit остаются на устройстве и разработчику недоступны.",
+  "_локализации": ["ru", "en-US"],
+  "_первичный_язык": "ru",
+  "_скриншоты": "store/screenshots — 8 файлов 1320×2868 (6,9″), по 4 на язык. Грузятся в набор APP_IPHONE_67: тип APP_IPHONE_69 API не знает."
+}
