@@ -1,0 +1,19 @@
+# Личные данные: журнал взвешиваний и дампы эфира (там видны все домашние устройства)
+measurements.csv
+scan_log.jsonl
+*_out.txt
+
+# Окружение и обёртка вокруг интерпретатора (собирается скриптом)
+.venv/
+BLEScan.app/
+
+# Xcode
+ios/Libra.xcodeproj/
+ios/build/
+build/
+DerivedData/
+*.xcuserdatad
+*.xcuserstate
+
+.DS_Store
+__pycache__/
