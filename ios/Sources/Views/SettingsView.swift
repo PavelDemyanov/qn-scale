@@ -19,6 +19,7 @@ struct SettingsView: View {
         @Bindable var s = settings
 
         List {
+            languageSection
             scaleSection
             goalSection
             chartSection
@@ -202,17 +203,24 @@ struct SettingsView: View {
 
     // MARK: - Вид
 
+    /// Язык — ПЕРВЫМ и отдельной секцией: это не настройка приложения в один
+    /// ряд с темой и напоминаниями, а то, на каком языке читается всё
+    /// остальное на этом экране.
+    private var languageSection: some View {
+        @Bindable var s = settings
+        return Section {
+            Picker(L("Language"), selection: $s.language) {
+                ForEach(AppLanguage.allCases) { lang in
+                    Text("\(lang.flag) \(lang.title)").tag(lang)
+                }
+            }
+            .pickerStyle(.segmented)
+        }
+    }
+
     private var appearanceSection: some View {
         @Bindable var s = settings
         return Section {
-            // Язык переключается ЗДЕСЬ, а не в системных настройках телефона:
-            // меняется сразу, без перезапуска. Названия языков — всегда на
-            // самом языке, чтобы их находили, не зная текущего.
-            Picker(L("Language"), selection: $s.language) {
-                ForEach(AppLanguage.allCases) { Text($0.title).tag($0) }
-            }
-            .pickerStyle(.segmented)
-
             Picker(L("Theme"), selection: $s.theme) {
                 ForEach(AppTheme.allCases, id: \.self) { Text($0.title).tag($0) }
             }
