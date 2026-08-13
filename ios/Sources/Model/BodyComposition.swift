@@ -53,6 +53,15 @@ struct BodyComposition: Equatable {
     /// Показываем рядом как «средний человек с такими же ростом, весом и возрастом».
     var fatPercentByBMI: Double
 
+    /// Индекс массы тела — единственная величина состава тела, которой не нужен
+    /// импеданс: только рост и вес. Поэтому она считается и для записей,
+    /// введённых руками или пришедших из «Здоровья».
+    static func bmi(weightKg: Double, heightCm: Double) -> Double? {
+        let m = heightCm / 100
+        guard m > 0.5, weightKg > 0 else { return nil }
+        return weightKg / (m * m)
+    }
+
     /// Доля воды в тощей массе — физиологическая константа.
     private static let hydrationOfLeanMass = 0.73
     /// Доля костного минерала в тощей массе.

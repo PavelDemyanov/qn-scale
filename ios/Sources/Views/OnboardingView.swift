@@ -54,10 +54,14 @@ struct OnboardingView: View {
                 }
             }
 
+            // `contentShape` обязателен: без него у текстовой кнопки нажимаются
+            // только сами буквы, а расширенная рамка остаётся мёртвой. Это и
+            // запирало человека без весов на первом шаге.
             Button(L("Skip")) { finish() }
                 .font(.system(size: 15))
                 .foregroundStyle(palette.fg2)
-                .frame(maxWidth: .infinity)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .contentShape(Rectangle())
                 .padding(.top, 16)
         }
         .padding(.horizontal, 24)
@@ -65,8 +69,12 @@ struct OnboardingView: View {
         .padding(.bottom, 34)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .background(palette.bg)
-        // Отступы 104 и 34 в макете отсчитываются от краёв экрана, а не от безопасной зоны.
-        .ignoresSafeArea()
+        // Только СВЕРХУ: отступ 104 в макете отсчитывается от края экрана.
+        // Снизу безопасную зону не трогаем — иначе «Пропустить» садится в
+        // полосу системного жеста «домой», и нажатия по ней съедает iOS.
+        // Человек без весов оставался запертым на первом шаге: другого выхода
+        // с него нет.
+        .ignoresSafeArea(edges: .top)
         .animation(.smooth, value: step)
         .sheet(isPresented: $editingProfile) {
             ProfileEditorView().environment(settings)

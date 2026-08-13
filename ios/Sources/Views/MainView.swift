@@ -10,6 +10,9 @@ struct MainView: View {
     let onGoal: () -> Void
     let onOpenHistory: () -> Void
     let onOpenDay: (WeighIn) -> Void
+    let onLoadSample: () -> Void
+    let onRemoveSample: () -> Void
+    let onImportHealth: () -> Void
 
     private var stats: Stats { Stats(items: items, goal: settings.goalWeight) }
 
@@ -37,7 +40,9 @@ struct MainView: View {
     var body: some View {
         Group {
             if items.isEmpty {
-                EmptyState(onManualAdd: onManualAdd)
+                EmptyState(onManualAdd: onManualAdd,
+                           onLoadSample: onLoadSample,
+                           onImportHealth: onImportHealth)
             } else {
                 switch settings.mainLayout {
                 case .numbers: LayoutNumbers(stats: stats, items: items, snapshot: snapshot,
@@ -47,6 +52,13 @@ struct MainView: View {
                                            onGoal: onGoal, onOpenDay: onOpenDay)
                 case .goal:    LayoutGoal(stats: stats, items: items, onManualAdd: onManualAdd, onGoal: onGoal)
                 }
+            }
+        }
+        .safeAreaInset(edge: .top) {
+            // Пример видно всегда, пока он лежит в истории: иначе демонстрация
+            // незаметно притворяется настоящими измерениями.
+            if items.contains(where: { $0.isSample }) {
+                SampleBanner(onRemove: onRemoveSample)
             }
         }
         .padding(.bottom, 24)
@@ -64,16 +76,47 @@ struct MainView: View {
 
 private struct EmptyState: View {
     let onManualAdd: () -> Void
+    let onLoadSample: () -> Void
+    let onImportHealth: () -> Void
 
     var body: some View {
+        // Три равноправных пути к данным. Раньше был один — «встаньте на
+        // весы», и человек без весов упирался в пустой экран, не понимая, что
+        // приложение вообще умеет.
         ContentUnavailableView {
             Label(L("First weigh-in"), systemImage: "scalemass")
         } description: {
-            Text(L("Step on the scale — the app connects on its own and records your weight."))
+            Text(L("Step on the scale and the weight is recorded by itself. No scale yet — add a weight by hand, import your history from Health, or look at a sample."))
         } actions: {
-            Button(L("Add weight manually"), action: onManualAdd)
-                .buttonStyle(.borderedProminent)
+            VStack(spacing: 10) {
+                Button(L("Add weight manually"), action: onManualAdd)
+                    .buttonStyle(.borderedProminent)
+                Button(L("Import history from Health"), action: onImportHealth)
+                Button(L("Load sample history"), action: onLoadSample)
+            }
         }
+    }
+}
+
+/// Полоса «это пример». Висит поверх содержимого, пока в истории есть
+/// демонстрационные записи, и убирается той же кнопкой.
+private struct SampleBanner: View {
+    @Environment(\.palette) private var palette
+    let onRemove: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "info.circle.fill")
+            Text(L("Sample history"))
+                .font(.subheadline.weight(.semibold))
+            Spacer()
+            Button(L("Remove"), action: onRemove)
+                .font(.subheadline.weight(.semibold))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(palette.orange.opacity(0.18))
+        .foregroundStyle(palette.orange)
     }
 }
 

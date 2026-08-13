@@ -12,13 +12,20 @@ final class WeighIn {
     var syncedToHealth: Bool = false
     /// Запись пришла импортом из «Здоровья», а не с весов: импеданса у неё нет.
     var fromHealth: Bool = false
+    /// Запись из примера истории. Пример нужен человеку, у которого весов ещё
+    /// нет: без него приложение выглядит пустым и понять, что оно умеет,
+    /// нельзя. Помечаем явно — чтобы пример был виден как пример и удалялся
+    /// одним действием, а не притворялся настоящими измерениями.
+    var isSample: Bool = false
 
-    init(date: Date = Date(), weightKg: Double, impedance1: Int, impedance2: Int, fromHealth: Bool = false) {
+    init(date: Date = Date(), weightKg: Double, impedance1: Int, impedance2: Int,
+         fromHealth: Bool = false, isSample: Bool = false) {
         self.date = date
         self.weightKg = weightKg
         self.impedance1 = impedance1
         self.impedance2 = impedance2
         self.fromHealth = fromHealth
+        self.isSample = isSample
     }
 
     func composition(for profile: Profile) -> BodyComposition? {

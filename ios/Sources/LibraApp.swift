@@ -181,7 +181,10 @@ struct RootView: View {
                          onManualAdd: { showManualEntry = true },
                          onGoal: { tab = .settings },
                          onOpenHistory: { tab = .history },
-                         onOpenDay: { selectedDay = $0 })
+                         onOpenDay: { selectedDay = $0 },
+                         onLoadSample: loadSample,
+                         onRemoveSample: removeSample,
+                         onImportHealth: { sheet = .healthImport })
             }
             .background(palette.bg)
             .navigationTitle(L("Weight"))
@@ -200,8 +203,18 @@ struct RootView: View {
 
     private var historyTab: some View {
         NavigationStack {
-            HistoryView(items: items, onOpenDay: { selectedDay = $0 })
+            HistoryView(items: items, onOpenDay: { selectedDay = $0 },
+                        onManualAdd: { showManualEntry = true },
+                        onLoadSample: loadSample,
+                        onImportHealth: { sheet = .healthImport })
                 .navigationTitle(L("History"))
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button(L("Add weight manually"), systemImage: "plus") {
+                            showManualEntry = true
+                        }
+                    }
+                }
         }
     }
 
@@ -210,7 +223,9 @@ struct RootView: View {
             SettingsView(items: items,
                          onSearchScale: { sheet = .connect },
                          onImportHealth: { sheet = .healthImport },
-                         onRestartOnboarding: { showOnboarding = true })
+                         onRestartOnboarding: { showOnboarding = true },
+                         onLoadSample: loadSample,
+                         onRemoveSample: removeSample)
         }
     }
 
@@ -222,12 +237,6 @@ struct RootView: View {
     // MARK: - Данные
 
     private func configure() {
-        #if DEBUG
-        if DemoData.isRequested, items.isEmpty {
-            DemoData.seed(into: context)
-            settings.onboardingDone = true
-        }
-        #endif
         scale.knownScaleID = settings.knownScaleID
         scale.onScaleRemembered = { id, mac in
             settings.knownScaleID = id
@@ -264,6 +273,17 @@ struct RootView: View {
         let enabled = settings.healthEnabled
         let profile = settings.profile
         Task { await health.save(weighIn: weighIn, profile: profile, enabled: enabled) }
+    }
+
+    /// Пример истории — обычное действие пользователя, доступное в любой
+    /// сборке: без него человек без весов видит пустое приложение.
+    private func loadSample() {
+        guard !items.contains(where: { $0.isSample }) else { return }
+        SampleHistory.insert(into: context)
+    }
+
+    private func removeSample() {
+        SampleHistory.remove(from: context, items: items)
     }
 
     private func delete(_ item: WeighIn) {

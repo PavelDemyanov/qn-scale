@@ -49,6 +49,17 @@ final class HealthStore {
             quantity: HKQuantity(unit: .gramUnit(with: .kilo), doubleValue: weighIn.weightKg),
             start: date, end: date))
 
+        // ИМТ зависит только от роста и веса, поэтому уходит и у записей без
+        // импеданса — у ручного ввода и у импорта из «Здоровья». Раньше он
+        // лежал под проверкой процента жира и терялся вместе с ним, хотя
+        // описание в App Store обещает «вес, жир и ИМТ».
+        if let bmi = BodyComposition.bmi(weightKg: weighIn.weightKg, heightCm: profile.heightCm) {
+            samples.append(HKQuantitySample(
+                type: HKQuantityType(.bodyMassIndex),
+                quantity: HKQuantity(unit: .count(), doubleValue: bmi),
+                start: date, end: date))
+        }
+
         if let composition = weighIn.composition(for: profile), !composition.fatPercent.isNaN {
             samples.append(HKQuantitySample(
                 type: HKQuantityType(.bodyFatPercentage),
@@ -57,10 +68,6 @@ final class HealthStore {
             samples.append(HKQuantitySample(
                 type: HKQuantityType(.leanBodyMass),
                 quantity: HKQuantity(unit: .gramUnit(with: .kilo), doubleValue: composition.leanMassKg),
-                start: date, end: date))
-            samples.append(HKQuantitySample(
-                type: HKQuantityType(.bodyMassIndex),
-                quantity: HKQuantity(unit: .count(), doubleValue: composition.bmi),
                 start: date, end: date))
         }
 

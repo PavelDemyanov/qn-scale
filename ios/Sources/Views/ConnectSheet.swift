@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Поиск и подключение весов. Шаги рукопожатия — настоящие, из ScaleManager.
 struct ConnectSheet: View {
@@ -8,13 +9,19 @@ struct ConnectSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var pulse = false
+    /// Поиск шёл вечно: ни таймаута, ни состояния «не нашлось». Человек без
+    /// весов упирался в бесконечный спиннер и неактивную кнопку.
+    @State private var searchedTooLong = false
+    @State private var timeout: Task<Void, Never>?
 
-    private enum Step { case searching, found, handshake, done }
+    private enum Step { case blocked, searching, notFound, found, handshake, done }
 
     private var step: Step {
         if scale.handshake.allDone { return .done }
         if !scale.pairingMode { return .handshake }
-        return scale.candidateName == nil ? .searching : .found
+        if scale.state == .bluetoothOff || scale.state == .unauthorized { return .blocked }
+        if scale.candidateName != nil { return .found }
+        return searchedTooLong ? .notFound : .searching
     }
 
     var body: some View {
@@ -40,22 +47,27 @@ struct ConnectSheet: View {
             if step == .found {
                 foundCard.padding(.top, 20)
             }
+            if step == .notFound || step == .blocked {
+                waysOut.padding(.top, 22)
+            }
             if step == .handshake || step == .done {
                 stepsCard.padding(.top, 20)
             }
 
             Spacer()
 
-            ActionButton(title: buttonTitle) {
-                switch step {
-                case .found: scale.confirmPairing()
-                case .done: dismiss()
-                default: break
+            if step != .notFound && step != .blocked {
+                ActionButton(title: buttonTitle) {
+                    switch step {
+                    case .found: scale.confirmPairing()
+                    case .done: dismiss()
+                    default: break
+                    }
                 }
+                .disabled(!buttonEnabled)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 34)
             }
-            .disabled(!buttonEnabled)
-            .padding(.horizontal, 16)
-            .padding(.bottom, 34)
         }
         // alignment: .top тут — страховка на случай, если исчезнет Spacer выше;
         // сама раскладка ломалась не из-за него, а из-за распорки в шапке (см. header).
@@ -72,13 +84,57 @@ struct ConnectSheet: View {
         .onAppear {
             pulse = true
             scale.startPairing()
+            timeout?.cancel()
+            timeout = Task { @MainActor in
+                // Двадцати секунд хватает: весы просыпаются за секунду-две,
+                // если на них наступить.
+                try? await Task.sleep(for: .seconds(20))
+                guard !Task.isCancelled else { return }
+                searchedTooLong = true
+            }
         }
         .onDisappear {
+            timeout?.cancel()
             if scale.pairingMode { scale.cancelPairing() }
+        }
+        .onChange(of: scale.candidateName) { _, name in
+            if name != nil { searchedTooLong = false }
         }
         .onChange(of: scale.scaleMAC) { _, mac in
             if let mac { settings.knownScaleMAC = mac }
         }
+    }
+
+    /// Что делать, если весов нет под рукой. Раньше из этого экрана вёл
+    /// единственный выход — «Отмена», и приложение оставалось пустым.
+    private var waysOut: some View {
+        VStack(spacing: 10) {
+            Button(L("Search again")) {
+                searchedTooLong = false
+                scale.startPairing()
+                timeout?.cancel()
+                timeout = Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(20))
+                    guard !Task.isCancelled else { return }
+                    searchedTooLong = true
+                }
+            }
+            .buttonStyle(.bordered)
+
+            if step == .blocked {
+                Button(L("Open iOS Settings")) {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(url)
+                    }
+                }
+                .buttonStyle(.bordered)
+            }
+
+            Button(L("Continue without a scale")) { dismiss() }
+                .buttonStyle(.borderedProminent)
+        }
+        .controlSize(.large)
+        .padding(.horizontal, 16)
     }
 
     private var indicator: some View {
@@ -103,6 +159,8 @@ struct ConnectSheet: View {
 
     private var title: String {
         switch step {
+        case .blocked:   return scale.state.caption
+        case .notFound:  return L("No scale found")
         case .searching: return L("Searching for scale…")
         case .found: return L("Scale found")
         case .handshake: return L("Connecting")
@@ -112,6 +170,8 @@ struct ConnectSheet: View {
 
     private var subtitle: String {
         switch step {
+        case .blocked:   return scale.state.hint
+        case .notFound:  return L("Step on the scale so it wakes up, and keep the phone nearby. No scale at hand? You can add weights by hand and look at a sample history — the app works without one.")
         case .searching: return L("Step on the scale to wake it up — while it's asleep it stays invisible over Bluetooth.")
         case .found: return L("This is the one if zeros are lit on its display right now.")
         case .handshake: return L("Setting the units and syncing the time — without this the scale won't start sending weight.")
@@ -121,6 +181,7 @@ struct ConnectSheet: View {
 
     private var buttonTitle: String {
         switch step {
+        case .blocked, .notFound: return L("Searching…")
         case .searching: return L("Searching…")
         case .found: return L("Connect")
         case .handshake: return L("Connecting…")

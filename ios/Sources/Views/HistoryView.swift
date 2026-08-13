@@ -11,6 +11,9 @@ struct HistoryView: View {
 
     let items: [WeighIn]
     let onOpenDay: (WeighIn) -> Void
+    let onManualAdd: () -> Void
+    let onLoadSample: () -> Void
+    let onImportHealth: () -> Void
 
     @State private var model = WeightChartModel()
 

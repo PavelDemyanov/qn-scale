@@ -12,6 +12,10 @@ struct SettingsView: View {
     let onSearchScale: () -> Void
     let onImportHealth: () -> Void
     let onRestartOnboarding: () -> Void
+    let onLoadSample: () -> Void
+    let onRemoveSample: () -> Void
+
+    private var hasSample: Bool { items.contains { $0.isSample } }
 
     private var stats: Stats { Stats(items: items, goal: settings.goalWeight) }
 
@@ -28,9 +32,24 @@ struct SettingsView: View {
             profileSection
             appearanceSection
 
+            // Пример истории — обычная функция, а не отладочный режим: пока
+            // весов нет, без него приложение выглядит пустым и понять, что оно
+            // умеет, невозможно.
+            Section {
+                if hasSample {
+                    Button(L("Remove sample history"), role: .destructive, action: onRemoveSample)
+                } else {
+                    Button(L("Load sample history"), action: onLoadSample)
+                }
+            } header: {
+                Text(L("Sample history"))
+            } footer: {
+                Text(L("Example weigh-ins for 126 days: they show what the charts, the goal and the forecast look like before you have a scale. They are marked in the app and removed with one tap."))
+            }
+
             Section {
                 Button(L("Run setup again"), action: onRestartOnboarding)
-                LabeledContent(L("Version"), value: "1.0 (1)")
+                LabeledContent(L("Version"), value: "1.0 (2)")
             }
         }
         .navigationTitle(L("Settings"))

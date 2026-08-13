@@ -8,6 +8,18 @@
 // 1 записей» — брак. Для них есть `Ln(_:_:)` в L10n.swift.
 
 let russianTranslations: [String: String] = [
+    "No scale found": "Весы не найдены",
+    "Step on the scale so it wakes up, and keep the phone nearby. No scale at hand? You can add weights by hand and look at a sample history — the app works without one.": "Наступите на весы, чтобы они проснулись, и держите телефон рядом. Весов под рукой нет? Вес можно добавлять вручную и посмотреть пример истории — приложение работает и без них.",
+    "Search again": "Искать снова",
+    "Open iOS Settings": "Открыть настройки iOS",
+    "Continue without a scale": "Продолжить без весов",
+    "Step on the scale and the weight is recorded by itself. No scale yet — add a weight by hand, import your history from Health, or look at a sample.": "Наступите на весы — вес запишется сам. Весов пока нет? Добавьте вес вручную, загрузите историю из «Здоровья» или посмотрите пример.",
+    "Load sample history": "Загрузить пример истории",
+    "Remove sample history": "Удалить пример истории",
+    "Sample history": "Пример истории",
+    "Remove": "Удалить",
+    "Step on the scale and the first measurement shows up here. No scale yet — add a weight by hand, import from Health, or look at a sample.": "Наступите на весы — первое измерение появится здесь. Весов пока нет? Добавьте вес вручную, загрузите историю из «Здоровья» или посмотрите пример.",
+    "Example weigh-ins for 126 days: they show what the charts, the goal and the forecast look like before you have a scale. They are marked in the app and removed with one tap.": "Примерные взвешивания за 126 дней: по ним видно, как выглядят графики, цель и прогноз, пока весов ещё нет. В приложении они помечены и удаляются одним нажатием.",
     "First weigh-in": "Первое взвешивание",
     "Step on the scale — the app connects on its own and records your weight.": "Наступите на весы — приложение подключится само и запишет вес.",
     "Add weight manually": "Добавить вес вручную",
