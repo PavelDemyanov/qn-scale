@@ -18,3 +18,9 @@ DerivedData/
 .DS_Store
 __pycache__/
 ios/build-sim/
+# Каталоги сборки, архива и экспорта: там подписанный ipa, dSYM'ы и логи Xcode
+# с сертификатом разработчика — в публичном репозитории им не место.
+ios/build-archive/
+ios/build-export/
+ios/build-shots/
+ios/ExportOptions.plist
