@@ -8,6 +8,8 @@
 // 1 записей» — брак. Для них есть `Ln(_:_:)` в L10n.swift.
 
 let russianTranslations: [String: String] = [
+    "THIS WEEK": "ЗА ЭТУ НЕДЕЛЮ",
+    "THIS MONTH": "ЗА ЭТОТ МЕСЯЦ",
     "No scale found": "Весы не найдены",
     "Step on the scale so it wakes up, and keep the phone nearby. No scale at hand? You can add weights by hand and look at a sample history — the app works without one.": "Наступите на весы, чтобы они проснулись, и держите телефон рядом. Весов под рукой нет? Вес можно добавлять вручную и посмотреть пример истории — приложение работает и без них.",
     "Search again": "Искать снова",

@@ -181,8 +181,8 @@ private struct LayoutNumbers: View {
             .cardInset()
 
             HStack(spacing: 11) {
-                DeltaTile(caption: L("PER WEEK"), value: stats.weekDelta)
-                DeltaTile(caption: L("PER MONTH"), value: stats.monthDelta)
+                DeltaTile(caption: L("THIS WEEK"), value: stats.weekDelta)
+                DeltaTile(caption: L("THIS MONTH"), value: stats.monthDelta)
             }
             .cardInset()
 
@@ -435,9 +435,9 @@ private struct LayoutChart: View {
         HStack(spacing: 0) {
             column(L("DAY"), stats.dayDelta)
             verticalSeparator
-            column(L("WEEK"), stats.weekDelta)
+            column(L("THIS WEEK"), stats.weekDelta)
             verticalSeparator
-            column(L("MONTH"), stats.monthDelta)
+            column(L("THIS MONTH"), stats.monthDelta)
         }
         .card(radius: 20)
         .cardInset()
@@ -571,8 +571,8 @@ private struct LayoutGoal: View {
             if settings.showForecast { forecastCard }
 
             HStack(spacing: 11) {
-                DeltaTile(caption: L("WEEK"), value: stats.weekDelta)
-                DeltaTile(caption: L("MONTH"), value: stats.monthDelta)
+                DeltaTile(caption: L("THIS WEEK"), value: stats.weekDelta)
+                DeltaTile(caption: L("THIS MONTH"), value: stats.monthDelta)
                 fatTile
             }
             .cardInset()
@@ -723,6 +723,14 @@ private struct WeekBarsCard: View {
     @Environment(\.palette) private var palette
     let stats: Stats
 
+    /// Полувысота поля столбиков: столько места отведено набору вверх и
+    /// снижению вниз по отдельности.
+    private let half: CGFloat = 46
+    /// Килограммы, при которых столбик достаёт до края. Обычная суточная
+    /// разница — доли килограмма, поэтому шкала мелкая, а всё, что больше,
+    /// упирается в край.
+    private let fullScale: Double = 0.8
+
     var body: some View {
         VStack(spacing: 0) {
             HStack {
@@ -735,30 +743,21 @@ private struct WeekBarsCard: View {
                     .foregroundStyle(palette.fg2)
             }
             .padding(.horizontal, 4)
-            .padding(.bottom, 12)
+            .padding(.bottom, 10)
 
-            HStack(alignment: .bottom, spacing: 6) {
+            HStack(alignment: .top, spacing: 6) {
                 ForEach(stats.currentWeek) { bar in
-                    VStack(spacing: 6) {
-                        Spacer(minLength: 0)
-                        // У будущего дня не «нет данных», а «ещё не наступил»:
-                        // прочерк тут читался бы как пропущенное взвешивание.
-                        Text(bar.isFuture ? " " : (bar.delta.map { Fmt.signed($0, 1) } ?? "—"))
-                            .font(.system(size: 11, weight: .semibold))
-                            .monospacedDigit()
-                            .foregroundStyle(bar.delta.map { palette.delta($0) } ?? palette.fg3)
-                        RoundedRectangle(cornerRadius: 5)
-                            .fill(barColor(bar))
-                            .frame(height: barHeight(bar))
-                        Text(bar.weekday)
-                            .font(.system(size: 11, weight: bar.isToday ? .semibold : .regular))
-                            .textCase(.uppercase)
-                            .foregroundStyle(bar.isToday ? palette.fg : palette.fg3)
-                    }
-                    .frame(maxWidth: .infinity)
+                    column(bar)
                 }
             }
-            .frame(height: 104)
+            // Нулевая линия — общая для всех столбиков: она и есть «вес не
+            // изменился», и от неё считаются оба направления.
+            .overlay(alignment: .top) {
+                Rectangle()
+                    .fill(palette.sep)
+                    .frame(height: 1)
+                    .padding(.top, half)
+            }
         }
         .padding(.horizontal, 14)
         .padding(.top, 16)
@@ -767,13 +766,65 @@ private struct WeekBarsCard: View {
         .cardInset()
     }
 
-    private func barHeight(_ bar: Stats.DayBar) -> CGFloat {
-        guard let delta = bar.delta else { return bar.isFuture ? 2 : 4 }
-        return max(5, min(58, abs(delta) * 62))
+    private func column(_ bar: Stats.DayBar) -> some View {
+        let delta = bar.delta ?? 0
+        let gained = delta > 0.0049
+        let lost = delta < -0.0049
+        return VStack(spacing: 0) {
+            // Верхняя половина: набор веса растёт вверх от линии.
+            VStack(spacing: 3) {
+                Spacer(minLength: 0)
+                if gained {
+                    Text(Fmt.signed(delta, 1))
+                        .font(.system(size: 11, weight: .semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(palette.red)
+                    bodyBar(delta, color: palette.red)
+                }
+            }
+            .frame(height: half)
+
+            // Нижняя половина: снижение уходит вниз от линии.
+            VStack(spacing: 3) {
+                if lost {
+                    bodyBar(delta, color: palette.green)
+                    Text(Fmt.signed(delta, 1))
+                        .font(.system(size: 11, weight: .semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(palette.green)
+                } else if !gained {
+                    // Ноль, пропуск и будущий день — короткая метка на линии,
+                    // чтобы колонка не выглядела потерянной.
+                    Capsule()
+                        .fill(bar.isFuture ? palette.seg : palette.fg3.opacity(0.5))
+                        .frame(height: 3)
+                        .padding(.horizontal, 2)
+                    if !bar.isFuture, bar.delta != nil {
+                        Text(Fmt.signed(0, 1))
+                            .font(.system(size: 11, weight: .semibold))
+                            .monospacedDigit()
+                            .foregroundStyle(palette.fg3)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .frame(height: half)
+
+            Text(bar.weekday)
+                .font(.system(size: 11, weight: bar.isToday ? .semibold : .regular))
+                .textCase(.uppercase)
+                .foregroundStyle(bar.isToday ? palette.fg : palette.fg3)
+                .padding(.top, 4)
+        }
+        .frame(maxWidth: .infinity)
     }
 
-    private func barColor(_ bar: Stats.DayBar) -> Color {
-        guard let delta = bar.delta else { return bar.isFuture ? palette.seg : palette.card2 }
-        return delta < -0.0049 ? palette.green : delta > 0.0049 ? palette.orange : palette.fg3
+    private func bodyBar(_ delta: Double, color: Color) -> some View {
+        // 16 пунктов оставлено подписи, остальное — столбику.
+        let room = half - 16
+        let height = Swift.max(5, Swift.min(room, CGFloat(abs(delta) / fullScale) * room))
+        return RoundedRectangle(cornerRadius: 5)
+            .fill(color)
+            .frame(height: height)
     }
 }

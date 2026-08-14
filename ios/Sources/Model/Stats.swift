@@ -32,19 +32,36 @@ struct Stats {
         return last.weightKg - previous.weightKg
     }
 
-    var weekDelta: Double? {
-        guard let last else { return nil }
-        if let a = average(from: 0, to: 7), let b = average(from: 7, to: 14) { return a - b }
-        guard let n = nearest(to: last.date.addingTimeInterval(-7 * Self.day)), n.id != last.id else { return nil }
-        return last.weightKg - n.weightKg
+    /// Изменение веса ВНУТРИ периода: последнее взвешивание минус последнее
+    /// взвешивание ДО начала периода. Именно так считается «за эту неделю»:
+    /// это ровно сумма столбиков по дням, и цифра сходится с картинкой.
+    ///
+    /// Скользящее окно «последние 7 дней против предыдущих 7» тут не годится:
+    /// подпись обещает календарный период, а показывала бы бегущее среднее.
+    private func delta(since start: Date) -> Double? {
+        guard let last, last.date >= start else { return nil }
+        if let before = items.last(where: { $0.date < start }) {
+            return last.weightKg - before.weightKg
+        }
+        // До начала периода взвешиваний не было — считаем от первого внутри него.
+        guard let first = items.first(where: { $0.date >= start }), first.id != last.id else { return nil }
+        return last.weightKg - first.weightKg
     }
 
-    var monthDelta: Double? {
-        guard let last else { return nil }
-        if let a = average(from: 0, to: 30), let b = average(from: 30, to: 60) { return a - b }
-        guard let n = nearest(to: last.date.addingTimeInterval(-30 * Self.day)), n.id != last.id else { return nil }
-        return last.weightKg - n.weightKg
+    /// Начало текущей недели. Понедельник задан явно, как и у столбиков.
+    var startOfWeek: Date {
+        var cal = Calendar.current
+        cal.firstWeekday = 2
+        return cal.dateInterval(of: .weekOfYear, for: Date())?.start ?? Date()
     }
+
+    var startOfMonth: Date {
+        let cal = Calendar.current
+        return cal.dateInterval(of: .month, for: Date())?.start ?? Date()
+    }
+
+    var weekDelta: Double? { delta(since: startOfWeek) }
+    var monthDelta: Double? { delta(since: startOfMonth) }
 
     /// Наклон линейной регрессии по последним 30 дням, кг в сутки.
     /// nil, если точек меньше трёх — по двум замерам «темп» был бы выдумкой.
