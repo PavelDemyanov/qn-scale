@@ -210,7 +210,9 @@ private struct LayoutNumbers: View {
 
     private var forecastSection: some View {
         VStack(spacing: 0) {
-            SectionHeader(text: settings.showForecast ? L("FORECAST AT THE CURRENT RATE") : L("GOAL"), top: 2)
+            // Период в заголовке: без него «текущий темп» — величина ниоткуда,
+            // и непонятно, что за история стоит за прогнозом.
+            SectionHeader(text: settings.showForecast ? L("FORECAST FROM THE LAST 30 DAYS") : L("GOAL"), top: 2)
             VStack(spacing: 0) {
                 ForEach(settings.showForecast
                         ? [(7.0, L("In a week")), (14.0, L("In 2 weeks")), (30.0, L("In a month"))]
@@ -233,7 +235,11 @@ private struct LayoutNumbers: View {
                              ? stats.goalDateLabel
                              : (stats.toGoal.map { L("%@ kg", Fmt.n($0)) } ?? "—"))
                             .font(.body.weight(.semibold))
-                            .foregroundStyle(palette.green)
+                            // Зелёным — только настоящая дата. Пометка «не
+                            // снижается» зелёной быть не должна: цвет читается
+                            // как «всё идёт по плану».
+                            .foregroundStyle(stats.goalDate != nil || !settings.showForecast
+                                             ? palette.green : palette.fg2)
                             .lineLimit(1)
                             .fixedSize()
                             .layoutPriority(1)
@@ -471,7 +477,7 @@ private struct LayoutChart: View {
         Button(action: onGoal) {
             HStack(spacing: 14) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(L("%@ — %@ kg", stats.goalDateLabel, Fmt.n(settings.goalWeight, 1)))
+                    Text(goalHeadline)
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(palette.fg)
                     Text(subtitle)
@@ -489,6 +495,17 @@ private struct LayoutChart: View {
         }
         .buttonStyle(.plain)
         .cardInset()
+    }
+
+    /// С датой — «2 октября — 77,0 кг». Без даты порядок обратный: сначала сама
+    /// цель, потом причина, иначе получалось «не снижается — 77,0 кг».
+    /// Причина — коротко: рядом со спарклайном фраза целиком занимала три
+    /// строки, а темп всё равно написан подписью ниже.
+    private var goalHeadline: String {
+        guard stats.goalDate != nil else {
+            return L("Goal %@ kg — %@", Fmt.n(settings.goalWeight, 1), stats.goalDateLabel)
+        }
+        return L("%@ — %@ kg", stats.goalDateLabel, Fmt.n(settings.goalWeight, 1))
     }
 
     private var subtitle: String {
@@ -707,7 +724,7 @@ private struct LayoutGoal: View {
 
     private var headline: String {
         guard stats.goalDate != nil else {
-            return L("Goal %@ kg — rate not available yet", Fmt.n(settings.goalWeight, 1))
+            return L("Goal %@ kg — %@", Fmt.n(settings.goalWeight, 1), stats.goalHint)
         }
         return L("If the rate holds, %@ kg on %@", Fmt.n(settings.goalWeight, 1), stats.goalDateLabel)
     }

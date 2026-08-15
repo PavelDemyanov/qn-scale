@@ -87,16 +87,57 @@ struct Stats {
 
     var toGoal: Double? { last.map { $0.weightKg - goal } }
 
-    /// Дата достижения цели по текущему темпу. nil, если вес не снижается.
-    var goalDate: Date? {
-        guard let last, let slope, let toGoal, slope < -0.004, toGoal > 0 else { return nil }
-        let days = toGoal / -slope
-        guard days.isFinite, days < 3650 else { return nil }
-        return last.date.addingTimeInterval(days * Self.day)
+    /// Почему даты достижения цели нет. Раньше на все случаи была одна подпись
+    /// «темп не задан» — и она врала: темп посчитан и написан строкой ниже,
+    /// просто ведёт он не к цели.
+    enum GoalOutlook {
+        case date(Date)
+        /// Вес уже не выше цели.
+        case reached
+        /// Темп известен, но вес не снижается — цель не приближается.
+        case notFalling
+        /// Снижение есть, но дата уходит за горизонт (больше десяти лет).
+        case tooSlow
+        /// Меньше трёх взвешиваний за 30 дней — темпа нет.
+        case noRate
     }
 
+    var goalOutlook: GoalOutlook {
+        guard let last, let toGoal else { return .noRate }
+        guard toGoal > 0 else { return .reached }
+        guard let slope else { return .noRate }
+        guard slope < -0.004 else { return .notFalling }
+        let days = toGoal / -slope
+        guard days.isFinite, days < 3650 else { return .tooSlow }
+        return .date(last.date.addingTimeInterval(days * Self.day))
+    }
+
+    /// Дата достижения цели по текущему темпу. nil, если вес не снижается.
+    var goalDate: Date? {
+        if case .date(let d) = goalOutlook { return d }
+        return nil
+    }
+
+    /// Короткая пометка в правой колонке строки — там места на фразу нет.
     var goalDateLabel: String {
-        goalDate.map(Fmt.dayMonth) ?? L("rate not set")
+        switch goalOutlook {
+        case .date(let d):  return Fmt.dayMonth(d)
+        case .reached:      return L("goal reached")
+        case .notFalling:   return L("not falling")
+        case .tooSlow:      return L("very slow")
+        case .noRate:       return L("not enough data")
+        }
+    }
+
+    /// То же самое фразой — там, где под текст отведена целая строка.
+    var goalHint: String {
+        switch goalOutlook {
+        case .date(let d):  return Fmt.dayMonth(d)
+        case .reached:      return L("the goal is already reached")
+        case .notFalling:   return L("weight isn't going down, so the goal isn't getting closer")
+        case .tooSlow:      return L("at this rate the goal is more than ten years away")
+        case .noRate:       return L("the rate appears after a few measurements")
+        }
     }
 
     /// Прогноз веса через N дней.
