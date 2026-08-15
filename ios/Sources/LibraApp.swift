@@ -134,7 +134,10 @@ struct RootView: View {
         .fullScreenCover(isPresented: $showLive) {
             LiveWeighView(items: items) {
                 showLive = false
-                scale.startSearching()
+                // Не `startSearching()`: он начинает НОВЫЙ сеанс, а весы ещё
+                // передают старый — и экран открывался повторно. К поиску
+                // приложение вернётся само, когда весы заснут и отключатся.
+                scale.dismissLiveResult()
             }
         }
         .fullScreenCover(isPresented: $showOnboarding) {

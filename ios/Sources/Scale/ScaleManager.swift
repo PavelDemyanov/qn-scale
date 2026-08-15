@@ -85,6 +85,11 @@ final class ScaleManager: NSObject {
     private var writeCharacteristic: CBCharacteristic?
     private var protocolVersion = QNProtocol.defaultProtocolVersion
     private var publishedThisSession = false
+    /// Результат этого взвешивания человек уже видел и закрыл. Весы в этот
+    /// момент ещё не спят и продолжают слать тот же кадр, поэтому мало погасить
+    /// живой вес — его нельзя принимать обратно до конца сеанса, иначе экран
+    /// результата выпрыгивает во второй раз (жалоба владельца 15.08.2026).
+    private var resultAcknowledged = false
     private var historyTimer: Timer?
 
     override init() {
@@ -97,11 +102,21 @@ final class ScaleManager: NSObject {
     func startSearching() {
         guard central?.state == .poweredOn else { return }
         publishedThisSession = false
+        resultAcknowledged = false
         liveWeightKg = nil
         handshake = Handshake()
         state = .searching
         central.scanForPeripherals(withServices: [CBUUID(string: QNProtocol.advertisedServiceUUID)],
                                    options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])
+    }
+
+    /// Человек закрыл экран результата. Сеанс на этом кончается: живой вес
+    /// гаснет и больше не принимается, пока весы не заснут и не проснутся
+    /// снова. Звать здесь `startSearching()` нельзя — он сбрасывает признак
+    /// показанного результата, и тот же кадр открывает экран заново.
+    func dismissLiveResult() {
+        liveWeightKg = nil
+        resultAcknowledged = true
     }
 
     /// Режим подбора: показываем найденные весы и ждём нажатия «Подключить».
@@ -184,7 +199,8 @@ final class ScaleManager: NSObject {
 
         case let .reading(reading), let .storedReading(reading):
             handshake.streaming = true
-            liveWeightKg = reading.weightKg
+            // Пока сеанс не закрыт человеком — показываем вес живьём.
+            if !resultAcknowledged { liveWeightKg = reading.weightKg }
             guard reading.isStable, !publishedThisSession else { return }
             publishedThisSession = true
             historyTimer?.invalidate()
