@@ -403,6 +403,7 @@ private struct LayoutChart: View {
                             padding: .init(top: 120, bottom: 64, leading: 0, trailing: 0),
                             pullGoal: false, showGoalLine: false,
                             showForecast: settings.showForecast,
+                            showDots: true, showDeltas: true,
                             endDotRing: palette.bg, lineWidth: 2.4)
 
                 VStack(alignment: .leading, spacing: 2) {

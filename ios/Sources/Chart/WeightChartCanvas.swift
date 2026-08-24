@@ -14,6 +14,9 @@ struct WeightChartCanvas: View, Equatable {
     let showGoalLine: Bool
     let showForecast: Bool
     let showAxis: Bool
+    /// Плашки с изменением веса у каждой засечки. Включаются точечно: на
+    /// спарклайне размером в две строки им негде поместиться.
+    var showDeltas = false
     var lineWidth: CGFloat = 2.3
 
     /// Сравнение по ШТАМПУ: движение тултипа полотно не трогает.
@@ -22,6 +25,7 @@ struct WeightChartCanvas: View, Equatable {
             && a.markerX == b.markerX && a.markerPoint == b.markerPoint
             && a.markerFatPoint == b.markerFatPoint
             && a.markerHeld == b.markerHeld && a.lineWidth == b.lineWidth
+            && a.showDeltas == b.showDeltas
             && a.showAxis == b.showAxis && a.showGoalLine == b.showGoalLine
             && a.showForecast == b.showForecast
     }
@@ -126,6 +130,43 @@ struct WeightChartCanvas: View, Equatable {
             c.stroke(plot.solid, with: .color(palette.blue),
                      style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round))
             c.fill(plot.dots, with: .color(palette.blue))
+
+            // Плашки с изменением: набрал — красная «+», сбросил — зелёная «−».
+            // Тот же язык цвета, что у столбиков недели.
+            //
+            // Рисуются НЕ у каждой засечки: на месяце их два десятка, и подписи
+            // легли бы одна на другую. Порядок — по ВЕЛИЧИНЕ изменения: место
+            // достаётся сначала заметным скачкам, а мелочь занимает остатки.
+            // Проверять надо против ВСЕХ уже поставленных, а не против одной
+            // предыдущей: набор рисуется над точкой, сброс под ней, и соседи
+            // через одного ложились друг на друга.
+            if showDeltas {
+                var drawn: [CGRect] = []
+                for sm in plot.samples.sorted(by: { abs($0.delta ?? 0) > abs($1.delta ?? 0) }) {
+                    // Нулевое изменение не подписываем: «+0,00» — это шум,
+                    // а сама засечка на месте и так видна.
+                    guard let d = sm.delta, abs(d) >= 0.005 else { continue }
+                    let up = d > 0
+                    let text = c.resolve(Text(L("%@ kg", Fmt.signed(d)))
+                        .font(.system(size: 10, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(.white))
+                    let ts = text.measure(in: CGSize(width: 200, height: 40))
+                    let w = ts.width + 12, h = ts.height + 5
+                    // Набор — над точкой, сброс — под ней: направление плашки
+                    // повторяет направление веса, как у столбиков недели.
+                    var y = up ? sm.point.y - 11 - h / 2 : sm.point.y + 11 + h / 2
+                    y = Swift.min(Swift.max(y, plot.padding.top + h / 2),
+                                  size.height - plot.padding.bottom - h / 2)
+                    let x = Swift.min(Swift.max(sm.point.x, plot.plot.minX + w / 2),
+                                      plot.plot.maxX - w / 2)
+                    let rect = CGRect(x: x - w / 2, y: y - h / 2, width: w, height: h)
+                    if drawn.contains(where: { $0.insetBy(dx: -3, dy: -3).intersects(rect) }) { continue }
+                    drawn.append(rect)
+                    c.fill(Path(roundedRect: rect, cornerRadius: h / 2),
+                           with: .color(up ? palette.red : palette.green))
+                    c.draw(text, at: CGPoint(x: x, y: y), anchor: .center)
+                }
+            }
 
             if let mx = markerX {
                 var v = Path()

@@ -23,6 +23,8 @@ struct WeightPlot {
         let kg: Double
         /// У ручных записей и импорта из «Здоровья» импеданса нет — жира тоже.
         let fat: Double?
+        /// Изменение к предыдущему измерению — берётся ГОТОВЫМ из снимка.
+        let delta: Double?
         let point: CGPoint
     }
 
@@ -41,6 +43,7 @@ struct WeightPlot {
         var dots = false
         var niceScale = false
         var fat = false
+        var deltas = false
     }
 
     var stamp = Stamp()
@@ -160,7 +163,8 @@ struct WeightPlot {
     static func build(_ s: WeightSnapshot, window: ChartWindow, goal: Double,
                       pullGoal: Bool, showGoalLine: Bool, showForecast: Bool,
                       showDots: Bool, size: CGSize, padding: Padding,
-                      niceScale: Bool = false, showFat: Bool = false) -> WeightPlot {
+                      niceScale: Bool = false, showFat: Bool = false,
+                      showDeltas: Bool = false) -> WeightPlot {
         var p = WeightPlot()
         p.size = size
         p.padding = padding
@@ -168,7 +172,7 @@ struct WeightPlot {
                         width: size.width, height: size.height, goal: goal,
                         pullGoal: pullGoal, goalLine: showGoalLine,
                         forecast: showForecast, dots: showDots, niceScale: niceScale,
-                        fat: showFat)
+                        fat: showFat, deltas: showDeltas)
         guard size.width > 1, size.height > 1, !s.isEmpty else { return p }
 
         p.t0 = s.timeline.date(at: window.w0)
@@ -327,6 +331,7 @@ struct WeightPlot {
         // ---- точки, прогноз, цель
         p.samples = seg.filter { $0.date >= p.t0 && $0.date <= p.t1 }
             .map { Sample(id: $0.id, date: $0.date, kg: $0.kg, fat: $0.fat,
+                          delta: s.deltas[$0.id],
                           point: CGPoint(x: p.x($0.date), y: p.y($0.kg))) }
         if showDots {
             for sm in p.samples {

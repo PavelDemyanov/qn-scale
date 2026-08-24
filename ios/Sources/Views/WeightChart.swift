@@ -20,6 +20,8 @@ struct WeightChart: View {
     var showForecast = true
     var showDots = false
     var showAxis = false
+    /// Плашки «+0,45 / −0,30» у засечек — только там, где под них есть место.
+    var showDeltas = false
     var endDotRing: Color?
     var lineWidth: CGFloat = 2.3
 
@@ -27,12 +29,13 @@ struct WeightChart: View {
         let plot = WeightPlot.build(snapshot, window: window, goal: goal,
                                     pullGoal: pullGoal, showGoalLine: showGoalLine,
                                     showForecast: showForecast, showDots: showDots,
-                                    size: size, padding: padding, niceScale: showAxis)
+                                    size: size, padding: padding, niceScale: showAxis,
+                                    showDeltas: showDeltas)
         ZStack(alignment: .topLeading) {
             WeightChartCanvas(plot: plot, palette: palette,
                               markerX: nil, markerPoint: nil, markerHeld: false,
                               showGoalLine: showGoalLine, showForecast: showForecast,
-                              showAxis: showAxis, lineWidth: lineWidth)
+                              showAxis: showAxis, showDeltas: showDeltas, lineWidth: lineWidth)
                 .equatable()
             if let ring = endDotRing, let end = plot.lastPoint {
                 ChartEndDot(point: end, ringColor: ring)
