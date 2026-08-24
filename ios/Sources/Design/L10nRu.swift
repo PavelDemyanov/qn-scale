@@ -113,7 +113,7 @@ let russianTranslations: [String: String] = [
     "Theme": "Тема",
     "Main screen": "Главный экран",
     "Appearance": "Вид",
-    "Three main-screen layouts to choose from — compare them live.": "Три компоновки главного экрана на выбор — сравните их вживую.",
+    "The main-screen layout is switched right on the Weight screen, above the numbers.": "Компоновка главного экрана переключается на самом экране «Вес», над цифрами.",
     "Height": "Рост",
     "cm": "см",
     "Date of birth": "Дата рождения",

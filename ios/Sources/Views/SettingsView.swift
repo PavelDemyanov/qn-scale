@@ -244,15 +244,12 @@ struct SettingsView: View {
                 ForEach(AppTheme.allCases, id: \.self) { Text($0.title).tag($0) }
             }
             .pickerStyle(.segmented)
-
-            Picker(L("Main screen"), selection: $s.mainLayout) {
-                ForEach(MainLayout.allCases, id: \.self) { Text($0.title).tag($0) }
-            }
-            .pickerStyle(.segmented)
         } header: {
             Text(L("Appearance"))
         } footer: {
-            Text(L("Three main-screen layouts to choose from — compare them live."))
+            // Переключатель компоновки уехал НА сам главный экран: выбирают её
+            // глазами, сравнивая, и ходить за этим в настройки неудобно.
+            Text(L("The main-screen layout is switched right on the Weight screen, above the numbers."))
         }
     }
 }

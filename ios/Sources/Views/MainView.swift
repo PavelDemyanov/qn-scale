@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Главный экран. Три компоновки из макета — переключаются в настройках.
+/// Главный экран. Три компоновки из макета — переключаются тут же, сверху.
 struct MainView: View {
     @Environment(\.palette) private var palette
     @Environment(AppSettings.self) private var settings
@@ -38,19 +38,27 @@ struct MainView: View {
     }
 
     var body: some View {
-        Group {
-            if items.isEmpty {
-                EmptyState(onManualAdd: onManualAdd,
-                           onLoadSample: onLoadSample,
-                           onImportHealth: onImportHealth)
-            } else {
-                switch settings.mainLayout {
-                case .numbers: LayoutNumbers(stats: stats, items: items, snapshot: snapshot,
-                                             onManualAdd: onManualAdd,
-                                             onGoal: onGoal, onOpenHistory: onOpenHistory)
-                case .chart:   LayoutChart(stats: stats, items: items, snapshot: snapshot,
-                                           onGoal: onGoal, onOpenDay: onOpenDay)
-                case .goal:    LayoutGoal(stats: stats, items: items, onManualAdd: onManualAdd, onGoal: onGoal)
+        VStack(spacing: 0) {
+            // Компоновку выбирают ГЛАЗАМИ, сравнивая экраны между собой, —
+            // значит и переключатель обязан быть здесь, а не в настройках:
+            // прежде на каждое сравнение приходилось идти в другой раздел и
+            // возвращаться обратно.
+            if !items.isEmpty { layoutPicker }
+
+            Group {
+                if items.isEmpty {
+                    EmptyState(onManualAdd: onManualAdd,
+                               onLoadSample: onLoadSample,
+                               onImportHealth: onImportHealth)
+                } else {
+                    switch settings.mainLayout {
+                    case .numbers: LayoutNumbers(stats: stats, items: items, snapshot: snapshot,
+                                                 onManualAdd: onManualAdd,
+                                                 onGoal: onGoal, onOpenHistory: onOpenHistory)
+                    case .chart:   LayoutChart(stats: stats, items: items, snapshot: snapshot,
+                                               onGoal: onGoal, onOpenDay: onOpenDay)
+                    case .goal:    LayoutGoal(stats: stats, items: items, onManualAdd: onManualAdd, onGoal: onGoal)
+                    }
                 }
             }
         }
@@ -69,6 +77,18 @@ struct MainView: View {
                                             showForecast: settings.showForecast,
                                             version: snapshotVersion)
         }
+    }
+
+    /// Системный сегментный переключатель — той же ширины, что карточки под ним.
+    private var layoutPicker: some View {
+        @Bindable var s = settings
+        return Picker(L("Main screen"), selection: $s.mainLayout) {
+            ForEach(MainLayout.allCases, id: \.self) { Text($0.title).tag($0) }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .cardInset()
+        .padding(.bottom, 4)
     }
 }
 
