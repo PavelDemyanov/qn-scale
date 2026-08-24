@@ -42,6 +42,8 @@ final class AppSettings {
     /// слева. Хранится между запусками: включивший её раз хочет видеть её и
     /// завтра, а кнопка под графиком стоит там же, где включалась.
     var showFatSeries: Bool { didSet { d.set(showFatSeries, forKey: "showFatSeries") } }
+    /// Плашки с изменением веса на главном графике.
+    var showDeltaPills: Bool { didSet { d.set(showDeltaPills, forKey: "showDeltaPills") } }
     /// Язык интерфейса. Держится ЗДЕСЬ, а не в системных настройках телефона:
     /// переключение внутри приложения меняет язык сразу, без перезапуска.
     var language: AppLanguage {
@@ -73,6 +75,9 @@ final class AppSettings {
         // По умолчанию выключено: жир есть не у всех записей, и лишняя
         // кривая на первом запуске мешает читать главное — вес.
         showFatSeries = d.bool(forKey: "showFatSeries")
+        // По умолчанию плашки ВКЛЮЧЕНЫ: ради них график и подписан, а кнопка
+        // рядом — чтобы убрать, когда мешают смотреть на саму линию.
+        showDeltaPills = d.object(forKey: "showDeltaPills") as? Bool ?? true
         // Первый запуск — берём язык телефона.
         language = AppLanguage(rawValue: d.string(forKey: "language") ?? "") ?? .system
         L10n.current = language

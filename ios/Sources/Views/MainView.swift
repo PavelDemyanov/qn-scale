@@ -403,7 +403,7 @@ private struct LayoutChart: View {
                             padding: .init(top: 120, bottom: 64, leading: 0, trailing: 0),
                             pullGoal: false, showGoalLine: false,
                             showForecast: settings.showForecast,
-                            showDots: true, showDeltas: true,
+                            showDots: true, showDeltas: settings.showDeltaPills,
                             endDotRing: palette.bg, lineWidth: 2.4)
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -445,12 +445,47 @@ private struct LayoutChart: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .padding(.horizontal, 16)
+                // Справа переключатель ужат: рядом, в одной с ним строке,
+                // стоит кнопка подписей.
+                .padding(.leading, 16)
+                .padding(.trailing, 56)
                 .frame(width: proxy.size.width, height: 40, alignment: .bottom)
                 .offset(y: 322 - 48)
+
+                // Выключатель плашек — в правом нижнем углу полотна, над
+                // переключателем периода: единственный угол, где кривой не
+                // бывает (она приходит туда только хвостом прогноза).
+                // Кнопка подписей — в правом нижнем углу полотна, в одной
+                // строке с периодом. Выше её ставить некуда: там проходит
+                // хвост прогноза, и кнопка садилась ровно на него.
+                //
+                // Поля — ДО рамки: отступ после неё увеличивает саму рамку и
+                // уносит кнопку за край полотна вместе с ней.
+                pillsToggle
+                    .padding(.trailing, 14)
+                    .padding(.bottom, 14)
+                    .frame(width: proxy.size.width, height: 322,
+                           alignment: .bottomTrailing)
             }
         }
         .frame(height: 322)
+    }
+
+    /// Кнопка «показать/скрыть подписи изменений». Системный тумблер-кнопка:
+    /// нажатое состояние он рисует сам, и объяснять его отдельной подписью не
+    /// приходится.
+    private var pillsToggle: some View {
+        @Bindable var s = settings
+        return Toggle(isOn: $s.showDeltaPills) {
+            Image(systemName: "plusminus")
+                .font(.system(size: 12, weight: .semibold))
+        }
+        .toggleStyle(.button)
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.circle)
+        .controlSize(.small)
+        .tint(palette.blue)
+        .accessibilityLabel(L("Change labels"))
     }
 
     private var lastLabel: String {
