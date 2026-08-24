@@ -163,7 +163,7 @@ struct RootView: View {
             // фокусе в шторке с несколькими детентами поднимает её на самый
             // большой — шторка выезжала до половины и тут же прыгала во весь
             // экран, показывая три строки на пустом листе.
-            .presentationDetents([.height(330)])
+            .presentationDetents([.height(390)])
         }
         .sheet(item: $sheet) { which in
             switch which {
