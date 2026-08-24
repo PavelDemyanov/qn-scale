@@ -158,9 +158,12 @@ struct RootView: View {
             ManualWeightSheet(lastWeight: items.last?.weightKg) { weight, date in
                 addManual(weight: weight, date: date)
             }
-            // Форма короткая — системный средний детент по ней и сидит,
-            // а не растягивает шторку почти во весь экран пустотой.
-            .presentationDetents([.medium, .large])
+            // ОДИН детент, и тот свой. Пара `[.medium, .large]` вела себя не
+            // так, как читается: поле веса получает фокус сразу, а SwiftUI при
+            // фокусе в шторке с несколькими детентами поднимает её на самый
+            // большой — шторка выезжала до половины и тут же прыгала во весь
+            // экран, показывая три строки на пустом листе.
+            .presentationDetents([.height(330)])
         }
         .sheet(item: $sheet) { which in
             switch which {
