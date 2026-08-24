@@ -30,6 +30,37 @@ enum WeightAxis {
         return (a, b, step)
     }
 
+    /// Шкала ВТОРОГО ряда, подогнанная под чужую сетку.
+    ///
+    /// Линии сетки рисуются по засечкам веса. Если у второго ряда делений
+    /// другое число, его подписи повиснут между линиями — и это читается как
+    /// ошибка отрисовки, а не как другая шкала. Поэтому шаг берётся сразу под
+    /// нужное число засечек, а верх наращивается до РОВНО того же их числа:
+    /// обе шкалы кладутся на одну высоту кадра, значит при равном числе
+    /// делений j-я подпись садится точно на j-ю линию.
+    static func aligned(lo: Double, hi: Double,
+                        ticks want: Int) -> (lo: Double, hi: Double, step: Double) {
+        guard want >= 2 else { return nice(lo: lo, hi: hi) }
+        var s = nice(lo: lo, hi: hi, maxTicks: want)
+        // `nice` в крайнем случае отдаёт засечек БОЛЬШЕ, чем просили: таблица
+        // шагов кончается на 20, и размах, который в неё не влез, разбивается
+        // мельче нужного. Тогда укрупняем шаг сами — иначе подписи второго ряда
+        // разъедутся с сеткой ровно там, где данные и так необычные.
+        while ticks(lo: s.lo, hi: s.hi, step: s.step).count > want {
+            let step = s.step * 2
+            let a = (lo / step).rounded(.down) * step
+            var b = (hi / step).rounded(.up) * step
+            if b <= a { b = a + step }
+            s = (a, b, step)
+        }
+        var n = ticks(lo: s.lo, hi: s.hi, step: s.step).count
+        while n < want {
+            s.hi += s.step
+            n += 1
+        }
+        return s
+    }
+
     static func ticks(lo: Double, hi: Double, step: Double) -> [Double] {
         guard step > 0, hi > lo, ((hi - lo) / step) < 100 else { return [lo] }
         return stride(from: lo, through: hi + step / 2, by: step).map { $0 }

@@ -33,6 +33,20 @@ final class WeightChartModel {
     private var base: Base?
 
     var timeline: WeightTimeline { snapshot.timeline }
+
+    /// Отмеченное измерение целиком — его показывает шапка карточки.
+    ///
+    /// Ищется по СНИМКУ, а не по геометрии кадра: шапка живёт выше полотна и
+    /// про пиксели ничего не знает. Окно проверяется здесь же — уехавшую за
+    /// край метку показывать нельзя, это чужое измерение.
+    var marked: WeightPoint? {
+        guard let d = markedDate, !snapshot.isEmpty,
+              d >= timeline.date(at: window.w0), d <= timeline.date(at: window.w1)
+        else { return nil }
+        return snapshot.points.min {
+            abs($0.date.timeIntervalSince(d)) < abs($1.date.timeIntervalSince(d))
+        }
+    }
     var period: WeightPeriod? { timeline.period(of: window) }
     var visibleDays: Int { Int(timeline.dataDays(window).rounded()) }
     var windowLabel: String {

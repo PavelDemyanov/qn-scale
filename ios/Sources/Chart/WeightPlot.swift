@@ -21,6 +21,8 @@ struct WeightPlot {
         let id: PersistentIdentifier
         let date: Date
         let kg: Double
+        /// У ручных записей и импорта из «Здоровья» импеданса нет — жира тоже.
+        let fat: Double?
         let point: CGPoint
     }
 
@@ -38,6 +40,7 @@ struct WeightPlot {
         var forecast = false
         var dots = false
         var niceScale = false
+        var fat = false
     }
 
     var stamp = Stamp()
@@ -63,6 +66,15 @@ struct WeightPlot {
     var goalInRange = false
     var lastPoint: CGPoint?
 
+    /// Второй ряд — процент жира. Своя шкала: проценты и килограммы несравнимы,
+    /// и на общей оси обе кривые расплющило бы в прямые.
+    var fatLine = Path()
+    var fatLo = 0.0
+    var fatHi = 1.0
+    var fatStep = 0.0
+    /// Ряд включён И в окне есть хотя бы одно измерение с жиром.
+    var hasFat = false
+
     /// ПОЛОСА ЛИНИИ — без колонки подписей справа. Именно её ширину получает
     /// жестовый слой: прежде сдвиг делился на полную ширину вью и не учитывал
     /// хвост, отчего график ехал заметно медленнее пальца.
@@ -81,6 +93,12 @@ struct WeightPlot {
     func y(_ v: Double) -> CGFloat {
         guard hi > lo else { return padding.top }
         return padding.top + CGFloat((hi - v) / (hi - lo)) * (size.height - padding.top - padding.bottom)
+    }
+
+    /// Жир — в своей шкале, но по ТОЙ ЖЕ высоте кадра, что и вес.
+    func fatY(_ v: Double) -> CGFloat {
+        guard fatHi > fatLo else { return padding.top }
+        return padding.top + CGFloat((fatHi - v) / (fatHi - fatLo)) * (size.height - padding.top - padding.bottom)
     }
 
     func date(atX px: CGFloat) -> Date {
@@ -142,14 +160,15 @@ struct WeightPlot {
     static func build(_ s: WeightSnapshot, window: ChartWindow, goal: Double,
                       pullGoal: Bool, showGoalLine: Bool, showForecast: Bool,
                       showDots: Bool, size: CGSize, padding: Padding,
-                      niceScale: Bool = false) -> WeightPlot {
+                      niceScale: Bool = false, showFat: Bool = false) -> WeightPlot {
         var p = WeightPlot()
         p.size = size
         p.padding = padding
         p.stamp = Stamp(version: s.version, w0: window.w0, w1: window.w1,
                         width: size.width, height: size.height, goal: goal,
                         pullGoal: pullGoal, goalLine: showGoalLine,
-                        forecast: showForecast, dots: showDots, niceScale: niceScale)
+                        forecast: showForecast, dots: showDots, niceScale: niceScale,
+                        fat: showFat)
         guard size.width > 1, size.height > 1, !s.isEmpty else { return p }
 
         p.t0 = s.timeline.date(at: window.w0)
@@ -263,9 +282,51 @@ struct WeightPlot {
             }
         }
 
+        // ---- второй ряд: процент жира
+        //
+        // Шкала считается ПО ВИДИМОМУ ОКНУ, как и вес: иначе кривая жира,
+        // размах которого за всю историю вдвое шире дневного, прижималась бы
+        // к середине кадра и не читалась вовсе.
+        if showFat {
+            var vals: [Double] = []
+            for pt in s.points where pt.date >= p.t0 && pt.date <= p.t1 {
+                if let f = pt.fat { vals.append(f) }
+            }
+            if let flo = vals.min(), let fhi = vals.max() {
+                let fpad = Swift.max(fhi - flo, 0.6) * 0.14
+                // Засечек РОВНО столько же, сколько у веса: сетку рисует вес, и
+                // оранжевые подписи обязаны стоять на его линиях, а не между.
+                let want = WeightAxis.ticks(lo: p.lo, hi: p.hi, step: p.step).count
+                let n = WeightAxis.aligned(lo: flo - fpad, hi: fhi + fpad, ticks: want)
+                p.fatLo = n.lo
+                p.fatHi = n.hi
+                p.fatStep = n.step
+                p.hasFat = true
+                // Линия РВЁТСЯ там, где жира нет: у записей, добавленных руками
+                // или пришедших из «Здоровья», импеданса не бывает, и тянуть
+                // отрезок сквозь них значит выдумывать измерение.
+                var run: [CGPoint] = []
+                func flushFat() {
+                    guard run.count > 1 else { return }
+                    var line = Path()
+                    line.addLines(run)
+                    p.fatLine.addPath(line)
+                }
+                for q in seg {
+                    guard let f = q.fat else {
+                        flushFat()
+                        run = []
+                        continue
+                    }
+                    run.append(CGPoint(x: p.x(q.date), y: p.fatY(f)))
+                }
+                flushFat()
+            }
+        }
+
         // ---- точки, прогноз, цель
         p.samples = seg.filter { $0.date >= p.t0 && $0.date <= p.t1 }
-            .map { Sample(id: $0.id, date: $0.date, kg: $0.kg,
+            .map { Sample(id: $0.id, date: $0.date, kg: $0.kg, fat: $0.fat,
                           point: CGPoint(x: p.x($0.date), y: p.y($0.kg))) }
         if showDots {
             for sm in p.samples {

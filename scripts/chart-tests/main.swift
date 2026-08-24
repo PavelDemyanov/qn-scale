@@ -257,6 +257,40 @@ do {
     check(flat.hi > flat.lo, "плоская история не схлопывает шкалу")
 }
 
+// MARK: Шкала второго ряда
+
+do {
+    // Сетку рисует ВЕС, значит у жира должно быть ровно столько же засечек:
+    // иначе оранжевые подписи висят между серыми линиями и читаются как брак.
+    let w = WeightAxis.nice(lo: 79.4, hi: 83.1)
+    let want = WeightAxis.ticks(lo: w.lo, hi: w.hi, step: w.step).count
+    let f = WeightAxis.aligned(lo: 24.2, hi: 28.7, ticks: want)
+    let got = WeightAxis.ticks(lo: f.lo, hi: f.hi, step: f.step)
+    check(got.count == want, "у жира столько же засечек, сколько у веса",
+          "\(got.count) против \(want)")
+    check(f.lo <= 24.2 && f.hi >= 28.7, "шкала жира накрывает данные",
+          "\(f.lo)…\(f.hi)")
+    check(near(f.lo.truncatingRemainder(dividingBy: f.step), 0, 1e-9),
+          "низ шкалы жира кратен шагу")
+
+    // Дотягивать приходится и снизу, и сверху: проверяем на нескольких
+    // размахах, что число засечек совпадает ВСЕГДА, а не случайно.
+    for (lo, hi) in [(10.0, 11.0), (18.5, 33.2), (25.0, 25.0), (0.4, 0.9)] {
+        for want in 2...5 {
+            let a = WeightAxis.aligned(lo: lo, hi: hi, ticks: want)
+            let n = WeightAxis.ticks(lo: a.lo, hi: a.hi, step: a.step).count
+            check(n == want, "совмещение держится на размахе \(lo)…\(hi) при \(want) засечках",
+                  "получилось \(n)")
+            check(a.lo <= lo && a.hi >= hi, "совмещённая шкала накрывает данные \(lo)…\(hi)",
+                  "\(a.lo)…\(a.hi)")
+        }
+    }
+
+    // Вырожденная просьба не роняет и не зацикливает.
+    let one = WeightAxis.aligned(lo: 20, hi: 30, ticks: 1)
+    check(one.hi > one.lo, "просьба об одной засечке не схлопывает шкалу")
+}
+
 print(failures == 0
       ? "✅ ядро графика: \(checks) проверок, все прошли"
       : "\(failures) из \(checks) проверок упали")

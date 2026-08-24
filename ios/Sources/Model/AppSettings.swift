@@ -38,6 +38,10 @@ final class AppSettings {
     var showGoalLine: Bool { didSet { d.set(showGoalLine, forKey: "showGoalLine") } }
     /// Серый пунктир прогноза и разделы с предсказанным весом.
     var showForecast: Bool { didSet { d.set(showForecast, forKey: "showForecast") } }
+    /// Оранжевая кривая процента жира на графике «Истории», со своей шкалой
+    /// слева. Хранится между запусками: включивший её раз хочет видеть её и
+    /// завтра, а кнопка под графиком стоит там же, где включалась.
+    var showFatSeries: Bool { didSet { d.set(showFatSeries, forKey: "showFatSeries") } }
     /// Язык интерфейса. Держится ЗДЕСЬ, а не в системных настройках телефона:
     /// переключение внутри приложения меняет язык сразу, без перезапуска.
     var language: AppLanguage {
@@ -66,6 +70,9 @@ final class AppSettings {
         // По умолчанию обе линии включены — но только если пользователь их ещё не трогал.
         showGoalLine = d.object(forKey: "showGoalLine") as? Bool ?? true
         showForecast = d.object(forKey: "showForecast") as? Bool ?? true
+        // По умолчанию выключено: жир есть не у всех записей, и лишняя
+        // кривая на первом запуске мешает читать главное — вес.
+        showFatSeries = d.bool(forKey: "showFatSeries")
         // Первый запуск — берём язык телефона.
         language = AppLanguage(rawValue: d.string(forKey: "language") ?? "") ?? .system
         L10n.current = language

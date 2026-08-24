@@ -8,6 +8,9 @@ import SwiftUI
 struct HistoryView: View {
     @Environment(\.palette) private var palette
     @Environment(AppSettings.self) private var settings
+    /// Телефон на боку — компактная высота. Именно по ней, а не по
+    /// `UIDevice.orientation`: последняя врёт, когда телефон лежит на столе.
+    @Environment(\.verticalSizeClass) private var vClass
 
     let items: [WeighIn]
     let onOpenDay: (WeighIn) -> Void
@@ -35,10 +38,14 @@ struct HistoryView: View {
                     profile: settings.profile)
     }
 
+    private var landscape: Bool { vClass == .compact }
+
     var body: some View {
         Group {
             if items.isEmpty {
                 emptyState
+            } else if landscape {
+                fullscreenChart
             } else {
                 List {
                     Section {
@@ -55,7 +62,14 @@ struct HistoryView: View {
                         }
                         .pickerStyle(.segmented)
 
-                        HistoryChartCard(model: model)
+                        HistoryChartCard(model: model,
+                                         onToggleFullscreen: {
+                            // Замок поворота в Пункте управления держат
+                            // включённым многие: без явной кнопки альбом был бы
+                            // им недоступен вовсе.
+                            OrientationLock.unlock()
+                            OrientationLock.rotate(to: .landscapeRight)
+                        })
                     }
                     .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
 
@@ -69,11 +83,48 @@ struct HistoryView: View {
                 .scrollDisabled(model.gesturing || model.markerHeld)
             }
         }
+        // Тулбары гасятся ЗДЕСЬ, а не внутри альбомной ветки: модификатор на
+        // всём экране переживает смену ветки, и таббар не мигает на повороте.
+        .toolbar(landscape ? .hidden : .visible, for: .navigationBar)
+        .toolbar(landscape ? .hidden : .visible, for: .tabBar)
+        .statusBarHidden(landscape)
+        .persistentSystemOverlays(landscape ? .hidden : .automatic)
+        // Поворот сносит ветку вместе с жестовым слоем, и терминального
+        // события от распознавателей может не прийти вовсе: флаги залипнут, а
+        // с ними — заблокированная прокрутка списка.
+        .onChange(of: landscape) { _, _ in model.abortGestures() }
         .onChange(of: key, initial: true) { _, k in
             model.digestGoal = k.goal
             model.digestForecast = k.forecast
             model.reload(items: items, settings: settings)
         }
+        // Альбом разрешён РОВНО на этом экране: маску отдаёт делегат
+        // приложения, и вне «Истории» она снова портретная — иначе на боку
+        // оказывались бы и весы, и настройки, под которые раскладки нет.
+        // Пустой истории поворот тоже ни к чему: там показывать нечего.
+        .onChange(of: items.isEmpty, initial: true) { _, empty in
+            empty ? OrientationLock.relock() : OrientationLock.unlock()
+        }
+        .onDisappear { OrientationLock.relock() }
+    }
+
+    /// Альбом: график во весь экран, без списка, шапки и таббара.
+    ///
+    /// Модель та же самая, поэтому окно, метка и включённый ряд жира
+    /// переживают поворот — человек продолжает смотреть ровно то место, на
+    /// которое смотрел до того, как повернул телефон.
+    private var fullscreenChart: some View {
+        GeometryReader { proxy in
+            HistoryChartCard(model: model,
+                             // Из высоты вычтено то, что карточка занимает
+                             // сама: шапка, щётка и ряд кнопок.
+                             chartHeight: Swift.max(160, proxy.size.height - HistoryChartCard.chromeHeight),
+                             fullscreen: true,
+                             onToggleFullscreen: { OrientationLock.relock() })
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+        }
+        .background(palette.bg)
     }
 
     /// Выбранный период. `nil` — окно не совпадает ни с одним пресетом (щипок

@@ -3,6 +3,9 @@ import SwiftData
 
 @main
 struct LibraApp: App {
+    /// Делегат нужен ровно за одним: он отдаёт системе разрешённые ориентации
+    /// (см. `OrientationLock`). Без него альбомный график включить нечем.
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var settings = AppSettings()
     @State private var scale = ScaleManager()
     @State private var health = HealthStore()
@@ -128,6 +131,11 @@ struct RootView: View {
         .onChange(of: scale.liveWeightKg) { old, new in
             if old == nil, new != nil, sheet == nil, selectedDay == nil,
                !showOnboarding, !showManualEntry {
+                // Экран взвешивания рисуется только в портрет, а приложение
+                // всё время слушает эфир: наступить на весы могут и тогда,
+                // когда график развёрнут на бок. Возвращаем портрет ДО показа,
+                // иначе результат откроется лёжа.
+                OrientationLock.relock()
                 showLive = true
             }
         }

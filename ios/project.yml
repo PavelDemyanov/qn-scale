@@ -40,7 +40,10 @@ targets:
         INFOPLIST_KEY_CFBundleDevelopmentRegion: ru
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIStatusBarStyle: UIStatusBarStyleLightContent
-        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        # Альбом разрешён РАДИ ОДНОГО экрана — полноэкранного графика в «Истории».
+        # Кто и когда его разрешает на самом деле, см. OrientationLock: маску
+        # отдаёт делегат, и вне «Истории» она остаётся портретной.
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
         INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription: Приложение соединяется с напольными весами по Bluetooth, чтобы прочитать вес.
         INFOPLIST_KEY_NSHealthUpdateUsageDescription: Вес и состав тела записываются в «Здоровье», чтобы данными могли пользоваться другие приложения.
         INFOPLIST_KEY_NSHealthShareUsageDescription: Доступ к «Здоровью» нужен, чтобы не дублировать уже записанные измерения.

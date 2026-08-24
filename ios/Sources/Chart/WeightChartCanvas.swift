@@ -7,6 +7,9 @@ struct WeightChartCanvas: View, Equatable {
     let palette: Palette
     let markerX: CGFloat?
     let markerPoint: CGPoint?
+    /// Та же метка на кривой жира — иначе непонятно, к какой её точке относится
+    /// процент в шапке.
+    var markerFatPoint: CGPoint?
     let markerHeld: Bool
     let showGoalLine: Bool
     let showForecast: Bool
@@ -17,6 +20,7 @@ struct WeightChartCanvas: View, Equatable {
     static func == (a: Self, b: Self) -> Bool {
         a.plot.stamp == b.plot.stamp && a.palette == b.palette
             && a.markerX == b.markerX && a.markerPoint == b.markerPoint
+            && a.markerFatPoint == b.markerFatPoint
             && a.markerHeld == b.markerHeld && a.lineWidth == b.lineWidth
             && a.showAxis == b.showAxis && a.showGoalLine == b.showGoalLine
             && a.showForecast == b.showForecast
@@ -32,7 +36,9 @@ struct WeightChartCanvas: View, Equatable {
                 for v in ticks {
                     let y = plot.y(v)
                     var g = Path()
-                    g.move(to: CGPoint(x: 0, y: y))
+                    // От начала ПОЛОСЫ ЛИНИИ, а не от края кадра: слева стоит
+                    // колонка подписей жира, и волоски шли сквозь цифры.
+                    g.move(to: CGPoint(x: plot.plot.minX, y: y))
                     g.addLine(to: CGPoint(x: plot.plot.maxX, y: y))
                     ctx.stroke(g, with: .color(palette.sep), lineWidth: 0.5)
                 }
@@ -50,12 +56,27 @@ struct WeightChartCanvas: View, Equatable {
                         .foregroundStyle(palette.green))
                     ctx.draw(t, at: CGPoint(x: size.width - 2, y: plot.goalY), anchor: .trailing)
                 }
+                // Шкала жира — СЛЕВА и оранжевым, чтобы её не спутать с
+                // килограммами справа. Своих засечек она не рисует: вторая
+                // сетка поверх первой превращает кадр в клетку.
+                if plot.hasFat {
+                    for v in WeightAxis.ticks(lo: plot.fatLo, hi: plot.fatHi, step: plot.fatStep) {
+                        let t = ctx.resolve(Text(Fmt.n(v, 1))
+                            .font(.system(size: 10.5).monospacedDigit())
+                            .foregroundStyle(palette.orange.opacity(0.85)))
+                        ctx.draw(t, at: CGPoint(x: 2, y: plot.fatY(v)), anchor: .leading)
+                    }
+                }
                 for i in 0..<3 {
                     let d = plot.t0.addingTimeInterval(plot.t1.timeIntervalSince(plot.t0) * Double(i) / 2)
                     let t = ctx.resolve(Text(Fmt.shortDayMonth(d))
                         .font(.system(size: 10.5))
                         .foregroundStyle(palette.fg3))
-                    let x = Swift.min(Swift.max(plot.x(d), 27), Swift.max(27, plot.plot.maxX - 7))
+                    // Отсчёт от НАЧАЛА полосы линии: с включённым жиром слева
+                    // стоит своя колонка подписей, и прежний абсолютный порог
+                    // 27 клал первую дату прямо на проценты.
+                    let lead = plot.plot.minX + 25
+                    let x = Swift.min(Swift.max(plot.x(d), lead), Swift.max(lead, plot.plot.maxX - 7))
                     ctx.draw(t, at: CGPoint(x: x, y: size.height - 8), anchor: .center)
                 }
             }
@@ -91,6 +112,13 @@ struct WeightChartCanvas: View, Equatable {
                 c.stroke(plot.forecast, with: .color(palette.fg3),
                          style: StrokeStyle(lineWidth: 1.9, lineCap: .round, dash: [3, 4]))
             }
+            // Жир — ПОД весом: вес главный, и перекрывать его вторым рядом
+            // нельзя. Заливки у жира нет намеренно — две заливки на одном
+            // кадре мешают читать обе.
+            if plot.hasFat {
+                c.stroke(plot.fatLine, with: .color(palette.orange),
+                         style: StrokeStyle(lineWidth: lineWidth * 0.8, lineCap: .round, lineJoin: .round))
+            }
             // Интерполяция — серым и тоньше: на этом отрезке взвешиваний не
             // было, и выдавать домысел за данные нельзя.
             c.stroke(plot.gap, with: .color(palette.fg3),
@@ -104,6 +132,12 @@ struct WeightChartCanvas: View, Equatable {
                 v.move(to: CGPoint(x: mx, y: 8))
                 v.addLine(to: CGPoint(x: mx, y: Swift.max(8, size.height - 28)))
                 c.stroke(v, with: .color(palette.fg3), lineWidth: 1)
+            }
+            if let fp = markerFatPoint {
+                let r: CGFloat = markerHeld ? 5.5 : 4
+                let box = CGRect(x: fp.x - r, y: fp.y - r, width: r * 2, height: r * 2)
+                c.fill(Path(ellipseIn: box), with: .color(palette.orange))
+                c.stroke(Path(ellipseIn: box), with: .color(palette.card), lineWidth: 2)
             }
             if let mp = markerPoint {
                 let r: CGFloat = markerHeld ? 7 : 5
