@@ -403,7 +403,13 @@ private struct LayoutChart: View {
                             padding: .init(top: 120, bottom: 64, leading: 0, trailing: 0),
                             pullGoal: false, showGoalLine: false,
                             showForecast: settings.showForecast,
-                            showDots: true, showDeltas: settings.showDeltaPills,
+                            // Засечки — только пока они различимы. То же
+                            // правило, что в «Истории»: на трёх месяцах
+                            // кружки по 5 пунктов смыкаются, и линия
+                            // превращается в цепочку бусин.
+                            showDots: snapshot.timeline.dataDays(
+                                snapshot.timeline.window(for: effectivePeriod)) <= 45,
+                            showDeltas: settings.showDeltaPills,
                             endDotRing: palette.bg, lineWidth: 2.4)
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -448,7 +454,7 @@ private struct LayoutChart: View {
                 // Справа переключатель ужат: рядом, в одной с ним строке,
                 // стоит кнопка подписей.
                 .padding(.leading, 16)
-                .padding(.trailing, 56)
+                .padding(.trailing, 72)
                 .frame(width: proxy.size.width, height: 40, alignment: .bottom)
                 .offset(y: 322 - 48)
 
@@ -478,12 +484,16 @@ private struct LayoutChart: View {
         @Bindable var s = settings
         return Toggle(isOn: $s.showDeltaPills) {
             Image(systemName: "plusminus")
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: 13, weight: .semibold))
+                // Значок в своей рамке: вместе с полями обычного размера
+                // кнопки это даёт зону нажатия около 44 пунктов. Кружок «по
+                // размеру значка» выходил вдвое меньше нормы, а рядом стоит
+                // переключатель периода — промахнуться было легко.
+                .frame(width: 26, height: 26)
         }
         .toggleStyle(.button)
         .buttonStyle(.bordered)
         .buttonBorderShape(.circle)
-        .controlSize(.small)
         .tint(palette.blue)
         .accessibilityLabel(L("Change labels"))
     }

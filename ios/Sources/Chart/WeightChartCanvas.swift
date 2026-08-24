@@ -141,30 +141,41 @@ struct WeightChartCanvas: View, Equatable {
             // предыдущей: набор рисуется над точкой, сброс под ней, и соседи
             // через одного ложились друг на друга.
             if showDeltas {
+                let font = Font.system(size: 10, weight: .semibold).monospacedDigit()
+                // Коробка меряется ОДИН раз по образцу, а не под каждую
+                // подпись: цифры моноширинные, ширина у всех одинаковая, а
+                // раскладка текста стоит дороже остальной отрисовки — и шла
+                // она даже для тех засечек, что потом отбрасывались.
+                let gauge = c.resolve(Text(L("%@ kg", Fmt.signed(-8.88))).font(font))
+                let gs = gauge.measure(in: CGSize(width: 200, height: 40))
+                let w = gs.width + 12, h = gs.height + 5
+                // Поле от края полотна: без него прижатая плашка упиралась в
+                // самый край экрана, тогда как у всего остального поле 16.
+                let edge: CGFloat = 6
                 var drawn: [CGRect] = []
                 for sm in plot.samples.sorted(by: { abs($0.delta ?? 0) > abs($1.delta ?? 0) }) {
                     // Нулевое изменение не подписываем: «+0,00» — это шум,
                     // а сама засечка на месте и так видна.
                     guard let d = sm.delta, abs(d) >= 0.005 else { continue }
                     let up = d > 0
-                    let text = c.resolve(Text(L("%@ kg", Fmt.signed(d)))
-                        .font(.system(size: 10, weight: .semibold).monospacedDigit())
-                        .foregroundStyle(.white))
-                    let ts = text.measure(in: CGSize(width: 200, height: 40))
-                    let w = ts.width + 12, h = ts.height + 5
                     // Набор — над точкой, сброс — под ней: направление плашки
                     // повторяет направление веса, как у столбиков недели.
                     var y = up ? sm.point.y - 11 - h / 2 : sm.point.y + 11 + h / 2
                     y = Swift.min(Swift.max(y, plot.padding.top + h / 2),
                                   size.height - plot.padding.bottom - h / 2)
-                    let x = Swift.min(Swift.max(sm.point.x, plot.plot.minX + w / 2),
-                                      plot.plot.maxX - w / 2)
+                    let x = Swift.min(Swift.max(sm.point.x, plot.plot.minX + edge + w / 2),
+                                      plot.plot.maxX - edge - w / 2)
                     let rect = CGRect(x: x - w / 2, y: y - h / 2, width: w, height: h)
                     if drawn.contains(where: { $0.insetBy(dx: -3, dy: -3).intersects(rect) }) { continue }
                     drawn.append(rect)
                     c.fill(Path(roundedRect: rect, cornerRadius: h / 2),
                            with: .color(up ? palette.red : palette.green))
-                    c.draw(text, at: CGPoint(x: x, y: y), anchor: .center)
+                    // Текст ТЁМНЫЙ: белый на светло-зелёном давал контраст
+                    // около двух к одному — на десяти пунктах это не читается.
+                    c.draw(c.resolve(Text(L("%@ kg", Fmt.signed(d)))
+                                        .font(font)
+                                        .foregroundStyle(Color.black)),
+                           at: CGPoint(x: x, y: y), anchor: .center)
                 }
             }
 

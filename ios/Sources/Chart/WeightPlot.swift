@@ -192,7 +192,11 @@ struct WeightPlot {
             lo = Swift.min(lo, goal)
             hi = Swift.max(hi, goal)
         }
-        let pad = Swift.max(hi - lo, 0.6) * 0.14
+        // Запас по вертикали. С плашками он больше: подпись занимает над своей
+        // точкой ~25 пунктов, и на прежних 14 % самая верхняя точка окна
+        // оказывалась к краю кадра ближе, чем высота плашки, — та садилась
+        // прямо на вершину кривой.
+        let pad = Swift.max(hi - lo, 0.6) * (showDeltas ? 0.30 : 0.14)
         lo -= pad
         hi += pad
         if niceScale {
@@ -330,8 +334,10 @@ struct WeightPlot {
 
         // ---- точки, прогноз, цель
         p.samples = seg.filter { $0.date >= p.t0 && $0.date <= p.t1 }
+            // Дельта достаётся из словаря ТОЛЬКО когда её собираются рисовать:
+            // на кадрах жеста в «Истории» это лишний поиск на каждую засечку.
             .map { Sample(id: $0.id, date: $0.date, kg: $0.kg, fat: $0.fat,
-                          delta: s.deltas[$0.id],
+                          delta: showDeltas ? s.deltas[$0.id] : nil,
                           point: CGPoint(x: p.x($0.date), y: p.y($0.kg))) }
         if showDots {
             for sm in p.samples {
