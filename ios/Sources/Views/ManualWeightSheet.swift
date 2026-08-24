@@ -60,11 +60,15 @@ struct ManualWeightSheet: View {
                     }
                     .disabled(weight == nil)
                 }
-                // Цифровая клавиатура без «Готово» не убирается — кнопка обязана быть.
+                // Цифровая клавиатура без «Готово» не убирается — кнопка
+                // обязана быть. По ЦЕНТРУ, а не у края: шторка короткая, и
+                // прижатую вправо плашку подрезал её закруглённый угол.
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
                     Button(L("Done")) { focused = false }
+                    Spacer()
                 }
+
             }
         }
         .onAppear { focused = true }
