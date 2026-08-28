@@ -82,10 +82,10 @@ struct HealthImportSheet: View {
             return L("Checking what weight records are there.")
         case .options:
             guard preview.found > 0 else {
-                return L("There are no weight records from other apps in Health.")
+                return L("There are no weight records in Health.")
             }
             let earliest = preview.earliest.map { L("The earliest is %@, %d.", Fmt.dayMonth($0), Calendar.current.component(.year, from: $0)) + " " } ?? ""
-            return earliest + L("Health has no impedance, so body fat will be empty for these records.")
+            return earliest + L("Body fat comes along where Health has it; impedance stays only with measurements taken on the scale.")
         case .running:
             return L("Reading records and computing daily deltas…")
         case .done:
@@ -146,7 +146,8 @@ struct HealthImportSheet: View {
                     skipped += 1
                 } else {
                     context.insert(WeighIn(date: sample.date, weightKg: sample.kg,
-                                           impedance1: 0, impedance2: 0, fromHealth: true))
+                                           impedance1: 0, impedance2: 0, fromHealth: true,
+                                           healthFatPercent: sample.fatPercent))
                     imported += 1
                 }
                 if index % 20 == 0 {

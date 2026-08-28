@@ -6,6 +6,13 @@ import HealthKit
 @MainActor
 final class HealthStore {
 
+    /// Одна запись из «Здоровья»: вес и, если он там есть, процент жира.
+    struct Sample {
+        let date: Date
+        let kg: Double
+        let fatPercent: Double?
+    }
+
     struct ImportResult {
         var found = 0
         var imported = 0
@@ -28,7 +35,11 @@ final class HealthStore {
     func requestAuthorization() async -> Bool {
         guard isAvailable else { return false }
         do {
-            try await store.requestAuthorization(toShare: shareTypes, read: [HKQuantityType(.bodyMass)])
+            // Читаем и жир тоже: без него восстановленная история состоит из
+            // одних килограммов, хотя проценты в «Здоровье» лежат рядом.
+            try await store.requestAuthorization(
+                toShare: shareTypes,
+                read: [HKQuantityType(.bodyMass), HKQuantityType(.bodyFatPercentage)])
             isAuthorized = true
         } catch {
             isAuthorized = false
@@ -79,23 +90,46 @@ final class HealthStore {
         }
     }
 
-    /// Все записи о весе, кроме написанных нами же.
-    func fetchWeightSamples() async -> [(date: Date, kg: Double)] {
+    /// ВСЕ записи о весе из «Здоровья», включая написанные нами же.
+    ///
+    /// Прежде свои записи отбрасывались по bundle id — при живой базе это
+    /// избавляло от дублей. Но именно они и составляют самую свежую часть
+    /// истории, и после переустановки «загрузить историю» возвращала всё, кроме
+    /// последних недель, то есть кроме того, ради чего её и зовут. Дубли
+    /// отсекает проверка по дню и весу, а не по источнику: своя запись, если
+    /// она в базе уже есть, отсеется как дубликат сама.
+    func fetchWeightSamples() async -> [Sample] {
         guard isAvailable else { return [] }
         if !isAuthorized { _ = await requestAuthorization() }
-        let ownBundle = Bundle.main.bundleIdentifier
 
-        return await withCheckedContinuation { continuation in
+        async let weights = quantitySamples(HKQuantityType(.bodyMass))
+        async let fats = quantitySamples(HKQuantityType(.bodyFatPercentage))
+
+        // Жир кладётся к весу ПО ВРЕМЕНИ: обе величины пишутся одним
+        // взвешиванием, но разными записями. Минутная сетка с проверкой соседей
+        // прощает расхождение в секунду-другую между ними.
+        var fatByMinute: [Int: Double] = [:]
+        for f in await fats {
+            fatByMinute[Self.minute(f.startDate)] = f.quantity.doubleValue(for: .percent()) * 100
+        }
+        return await weights.map { w in
+            let key = Self.minute(w.startDate)
+            let fat = fatByMinute[key] ?? fatByMinute[key - 1] ?? fatByMinute[key + 1]
+            return Sample(date: w.startDate,
+                          kg: w.quantity.doubleValue(for: .gramUnit(with: .kilo)),
+                          fatPercent: fat)
+        }
+    }
+
+    private static func minute(_ d: Date) -> Int { Int(d.timeIntervalSince1970 / 60) }
+
+    private func quantitySamples(_ type: HKQuantityType) async -> [HKQuantitySample] {
+        await withCheckedContinuation { continuation in
             let sort = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)
-            let query = HKSampleQuery(sampleType: HKQuantityType(.bodyMass),
-                                      predicate: nil,
+            let query = HKSampleQuery(sampleType: type, predicate: nil,
                                       limit: HKObjectQueryNoLimit,
                                       sortDescriptors: [sort]) { _, samples, _ in
-                let result = (samples as? [HKQuantitySample] ?? [])
-                    .filter { $0.sourceRevision.source.bundleIdentifier != ownBundle }
-                    .map { (date: $0.startDate,
-                            kg: $0.quantity.doubleValue(for: .gramUnit(with: .kilo))) }
-                continuation.resume(returning: result)
+                continuation.resume(returning: samples as? [HKQuantitySample] ?? [])
             }
             store.execute(query)
         }
@@ -113,7 +147,7 @@ final class HealthStore {
     }
 
     /// Дубликат — измерение в тот же день с почти тем же весом.
-    static func isDuplicate(_ sample: (date: Date, kg: Double), in existing: [WeighIn]) -> Bool {
+    static func isDuplicate(_ sample: Sample, in existing: [WeighIn]) -> Bool {
         let cal = Calendar.current
         return existing.contains { item in
             cal.isDate(item.date, inSameDayAs: sample.date) && abs(item.weightKg - sample.kg) < 0.05
