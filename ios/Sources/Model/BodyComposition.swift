@@ -94,6 +94,29 @@ struct BodyComposition: Equatable {
     /// Доля костного минерала в тощей массе.
     private static let boneShareOfLeanMass = 0.05
 
+    /// Импеданс, восстановленный из готового процента жира по уравнению Wu.
+    ///
+    /// Нужен ровно для одного случая: записи, которые приложение само записало
+    /// в «Здоровье», пока считало по Wu, возвращаются оттуда БЕЗ импеданса —
+    /// одним замороженным процентом. Такая запись перестаёт пересчитываться, и
+    /// в истории появляется ступенька между «замороженными» и живыми
+    /// измерениями. Уравнение Wu обратимо точно, поэтому импеданс из процента
+    /// восстанавливается один в один — и запись снова считается любой формулой.
+    ///
+    /// nil, если результат вне разумного диапазона: значит, процент писало не
+    /// наше приложение и предположение о формуле неверно.
+    static func impedanceFromWu(fatPercent: Double, weightKg: Double, profile: Profile) -> Int? {
+        guard weightKg > 0, fatPercent > 0, fatPercent < 70 else { return nil }
+        let age = Double(profile.age)
+        let sex = profile.isMale ? 1.0 : 0.0
+        let lean = weightKg * (1 - fatPercent / 100)
+        let riTerm = lean - 13.055 - 0.204 * weightKg + 0.136 * age - 8.125 * sex
+        guard riTerm > 0.1 else { return nil }
+        let ohm = 0.394 * profile.heightCm * profile.heightCm / riTerm
+        guard ohm >= 200, ohm <= 900 else { return nil }
+        return Int(ohm.rounded())
+    }
+
     static func compute(weightKg: Double, impedanceOhm: Int, profile: Profile) -> BodyComposition? {
         let heightM = profile.heightCm / 100
         guard weightKg > 0, heightM > 0 else { return nil }

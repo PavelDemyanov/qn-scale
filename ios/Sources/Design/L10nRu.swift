@@ -100,6 +100,8 @@ let russianTranslations: [String: String] = [
     "Save to Health": "Записывать в «Здоровье»",
     "Import history from Health": "Загрузить историю из «Здоровья»",
     "Health": "Здоровье",
+    "Recalculate restored records": "Пересчитать восстановленные записи",
+    "%@ restored from Health keep the body fat that was written back then and do not follow the formula setting — hence the step in the chart. The app can recover the impedance from those numbers and count them like the rest; this only works for records this app wrote itself.": "%@, восстановленных из «Здоровья», хранят процент жира, записанный тогда, и не подчиняются выбору формулы — отсюда ступенька на графике. Приложение может восстановить из этих чисел импеданс и считать их наравне с остальными; это работает только с записями, которые оно записало само.",
     "Weight, body fat and BMI go to Health — other apps will pick them up.": "Вес, процент жира и ИМТ попадут в «Здоровье» — их подхватят другие приложения.",
     "Remind me to weigh in": "Напоминать взвешиваться",
     "Time": "Время",

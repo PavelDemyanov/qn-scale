@@ -145,9 +145,13 @@ struct HealthImportSheet: View {
                 if skipDuplicates, HealthStore.isDuplicate(sample, in: items) {
                     skipped += 1
                 } else {
+                    // Импеданс из примечаний, если он там есть: с ним запись
+                    // снова живая — пересчитывается вместе со всеми.
                     context.insert(WeighIn(date: sample.date, weightKg: sample.kg,
-                                           impedance1: 0, impedance2: 0, fromHealth: true,
-                                           healthFatPercent: sample.fatPercent))
+                                           impedance1: sample.impedanceOhm ?? 0, impedance2: 0,
+                                           fromHealth: true,
+                                           healthFatPercent: sample.impedanceOhm == nil
+                                                             ? sample.fatPercent : nil))
                     imported += 1
                 }
                 if index % 20 == 0 {

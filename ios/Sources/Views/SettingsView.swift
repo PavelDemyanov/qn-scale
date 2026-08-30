@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 /// Настройки — системный сгруппированный список: секции с заголовками и подписями,
 /// родные Toggle, Stepper, DatePicker и NavigationLink вместо самодельных строк.
@@ -7,6 +8,7 @@ struct SettingsView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(ScaleManager.self) private var scale
     @Environment(HealthStore.self) private var health
+    @Environment(\.modelContext) private var context
 
     let items: [WeighIn]
     let onSearchScale: () -> Void
@@ -143,6 +145,27 @@ struct SettingsView: View {
 
     // MARK: - Здоровье
 
+    /// Записи, у которых процент жира заморожен: импеданса нет, а значит и
+    /// пересчитать их нельзя.
+    private var frozen: [WeighIn] {
+        items.filter { $0.impedance1 == 0 && $0.healthFatPercent != nil }
+    }
+
+    /// Восстанавливает импеданс из замороженного процента и стирает сам
+    /// процент: дальше запись считается наравне со всеми, любой формулой.
+    private func unfreeze() {
+        for item in frozen {
+            guard let fat = item.healthFatPercent,
+                  let ohm = BodyComposition.impedanceFromWu(fatPercent: fat,
+                                                            weightKg: item.weightKg,
+                                                            profile: settings.profile)
+            else { continue }
+            item.impedance1 = ohm
+            item.healthFatPercent = nil
+        }
+        try? context.save()
+    }
+
     private var healthSection: some View {
         @Bindable var s = settings
         return Section {
@@ -153,10 +176,17 @@ struct SettingsView: View {
                                value: settings.importedFromHealth > 0
                                       ? Ln(settings.importedFromHealth, "record") : "")
             }
+            // Строка появляется, только пока есть что чинить, и исчезает сама.
+            if !frozen.isEmpty {
+                Button(L("Recalculate restored records"), action: unfreeze)
+            }
         } header: {
             Text(L("Health"))
         } footer: {
-            Text(L("Weight, body fat and BMI go to Health — other apps will pick them up."))
+            Text(frozen.isEmpty
+                 ? L("Weight, body fat and BMI go to Health — other apps will pick them up.")
+                 : L("Weight, body fat and BMI go to Health — other apps will pick them up.") + "\n\n"
+                   + L("%@ restored from Health keep the body fat that was written back then and do not follow the formula setting — hence the step in the chart. The app can recover the impedance from those numbers and count them like the rest; this only works for records this app wrote itself.", Ln(frozen.count, "record")))
         }
         .onChange(of: settings.healthEnabled) { _, on in
             if on { Task { _ = await health.requestAuthorization() } }

@@ -6,12 +6,23 @@ import HealthKit
 @MainActor
 final class HealthStore {
 
-    /// Одна запись из «Здоровья»: вес и, если он там есть, процент жира.
+    /// Одна запись из «Здоровья»: вес, а также импеданс и процент жира, если
+    /// они там нашлись.
     struct Sample {
         let date: Date
         let kg: Double
         let fatPercent: Double?
+        /// Импеданс, который приложение положило в примечания к своей же
+        /// записи. Есть только у записей, сделанных начиная с этой версии.
+        let impedanceOhm: Int?
     }
+
+    /// Ключи примечаний. Импеданс кладётся к записи о весе, потому что без него
+    /// вернувшаяся из «Здоровья» история перестаёт пересчитываться: остаётся
+    /// один замороженный процент жира, посчитанный давно и, возможно, другой
+    /// формулой.
+    private static let impedanceKey = "com.redpax.Libra.impedance"
+    private static let impedance2Key = "com.redpax.Libra.impedance2"
 
     struct ImportResult {
         var found = 0
@@ -55,10 +66,15 @@ final class HealthStore {
         var samples: [HKQuantitySample] = []
         let date = weighIn.date
 
+        var meta: [String: Any] = [:]
+        if weighIn.impedance1 > 0 { meta[Self.impedanceKey] = weighIn.impedance1 }
+        if weighIn.impedance2 > 0 { meta[Self.impedance2Key] = weighIn.impedance2 }
+
         samples.append(HKQuantitySample(
             type: HKQuantityType(.bodyMass),
             quantity: HKQuantity(unit: .gramUnit(with: .kilo), doubleValue: weighIn.weightKg),
-            start: date, end: date))
+            start: date, end: date,
+            metadata: meta.isEmpty ? nil : meta))
 
         // ИМТ зависит только от роста и веса, поэтому уходит и у записей без
         // импеданса — у ручного ввода и у импорта из «Здоровья». Раньше он
@@ -117,7 +133,8 @@ final class HealthStore {
             let fat = fatByMinute[key] ?? fatByMinute[key - 1] ?? fatByMinute[key + 1]
             return Sample(date: w.startDate,
                           kg: w.quantity.doubleValue(for: .gramUnit(with: .kilo)),
-                          fatPercent: fat)
+                          fatPercent: fat,
+                          impedanceOhm: w.metadata?[Self.impedanceKey] as? Int)
         }
     }
 
