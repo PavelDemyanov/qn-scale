@@ -1,5 +1,27 @@
 import Foundation
 
+/// Уравнение, по которому считается процент жира. Оба выведены для весов
+/// «нога–нога», но на разных людях, и на высоком росте расходятся на восемь
+/// процентных пунктов — поэтому выбор отдан владельцу, а не зашит намертво.
+enum FatFormula: String, Codable, CaseIterable, Identifiable {
+    /// Jebb et al., Br J Nutr 2000: 104 мужчины и 101 женщина, рост 1,58–1,93 м,
+    /// эталон — четырёхкомпонентная модель, остаточное СКО 4,8 п.п. у мужчин.
+    case jebb
+    /// Wu et al., Nutr J 2015: тайваньская выборка со средним ростом мужчин
+    /// 173 см. Роста отдельным членом в уравнении нет, поэтому на 185–190 см
+    /// оно недосчитывает тощую массу и завышает жир.
+    case wu
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .jebb: return L("Jebb (2000)")
+        case .wu: return L("Wu (2015)")
+        }
+    }
+}
+
 /// Профиль человека — нужен, чтобы из веса и импеданса посчитать состав тела.
 struct Profile: Equatable {
     var heightCm: Double = 178
@@ -8,6 +30,8 @@ struct Profile: Equatable {
     /// Поправка к проценту жира в процентных пунктах — если есть чему доверять больше
     /// (DXA, InBody) или хочется сойтись с родным приложением.
     var fatCalibration: Double = 0
+    /// Какое уравнение считает жир.
+    var fatFormula: FatFormula = .jebb
 
     var age: Int {
         Calendar.current.dateComponents([.year], from: birthDate, to: Date()).year ?? 35
@@ -23,6 +47,7 @@ extension Profile: Codable {
         birthDate = try c.decodeIfPresent(Date.self, forKey: .birthDate) ?? fallback.birthDate
         isMale = try c.decodeIfPresent(Bool.self, forKey: .isMale) ?? fallback.isMale
         fatCalibration = try c.decodeIfPresent(Double.self, forKey: .fatCalibration) ?? 0
+        fatFormula = try c.decodeIfPresent(FatFormula.self, forKey: .fatFormula) ?? fallback.fatFormula
     }
 }
 
@@ -99,12 +124,25 @@ struct BodyComposition: Equatable {
         // тощую массу 57 кг, то есть FFMI 16,2 при пороге истощения по ESPEN
         // 17,0, — и это у тренирующегося человека с ИМТ 23. Jebb на тех же
         // измерениях даёт 19–20 % жира и FFMI 18,3, что правдоподобно.
-        let rawFatPercent = -156.1
-            - 89.1 * log(heightM)
-            + 45.6 * log(weightKg)
-            + 0.120 * age
-            + 0.0494 * Double(impedanceOhm)
-            + (profile.isMale ? 0 : 19.6 * log(heightM))
+        let rawFatPercent: Double
+        switch profile.fatFormula {
+        case .jebb:
+            rawFatPercent = -156.1
+                - 89.1 * log(heightM)
+                + 45.6 * log(weightKg)
+                + 0.120 * age
+                + 0.0494 * Double(impedanceOhm)
+                + (profile.isMale ? 0 : 19.6 * log(heightM))
+        case .wu:
+            // Через тощую массу: уравнение предсказывает именно её.
+            let resistanceIndex = (profile.heightCm * profile.heightCm) / Double(impedanceOhm)
+            let predictedLean = 13.055
+                + 0.204 * weightKg
+                + 0.394 * resistanceIndex
+                - 0.136 * age
+                + 8.125 * sex
+            rawFatPercent = (weightKg - predictedLean) / weightKg * 100
+        }
         let fatPercent = min(max(rawFatPercent + profile.fatCalibration, 3), 60)
 
         let leanMass = weightKg * (1 - fatPercent / 100)

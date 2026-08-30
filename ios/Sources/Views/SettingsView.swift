@@ -206,7 +206,7 @@ struct SettingsView: View {
     private var profileSection: some View {
         Section {
             NavigationLink {
-                ProfileEditorView()
+                ProfileEditorView(items: items)
             } label: {
                 LabeledContent(L("Profile"), value: profileSummary)
             }
@@ -259,6 +259,10 @@ struct ProfileEditorView: View {
     @Environment(AppSettings.self) private var settings
     @FocusState private var focus: Field?
 
+    /// Нужны только чтобы показать обе оценки на последнем измерении. В
+    /// онбординге истории ещё нет — там список пустой, и сравнения не будет.
+    var items: [WeighIn] = []
+
     private enum Field { case height, calibration }
 
     var body: some View {
@@ -287,6 +291,16 @@ struct ProfileEditorView: View {
             }
 
             Section {
+                Picker(L("Fat formula"), selection: $s.profile.fatFormula) {
+                    ForEach(FatFormula.allCases) { Text($0.title).tag($0) }
+                }
+            } header: {
+                Text(L("Formula"))
+            } footer: {
+                Text(formulaFooter)
+            }
+
+            Section {
                 LabeledContent(L("Body fat offset")) {
                     HStack {
                         TextField("0", value: $s.profile.fatCalibration, format: .number)
@@ -311,5 +325,27 @@ struct ProfileEditorView: View {
                 Button(L("Done")) { focus = nil }.fontWeight(.semibold)
             }
         }
+    }
+
+    private var formulaFooter: String {
+        let about = L("Both equations are made for foot-to-foot scales. Jebb: 104 men and 101 women, height 1.58–1.93 m, checked against a four-compartment model. Wu: a Taiwanese cohort averaging 173 cm — at a greater height it reads noticeably higher.")
+        guard let comparison else { return about }
+        return about + "\n\n" + L("On your last measurement: %@", comparison)
+    }
+
+    /// Обе оценки на последнем измерении с импедансом: выбирать вслепую между
+    /// двумя фамилиями бессмысленно, а между «20 %» и «29 %» — понятно.
+    private var comparison: String? {
+        guard let last = items.last(where: { $0.impedance1 > 0 }) else { return nil }
+        let parts = FatFormula.allCases.compactMap { formula -> String? in
+            var probe = settings.profile
+            probe.fatFormula = formula
+            guard let value = BodyComposition.compute(weightKg: last.weightKg,
+                                                      impedanceOhm: last.impedance1,
+                                                      profile: probe)?.fatPercent,
+                  !value.isNaN else { return nil }
+            return formula.title + " — " + L("%@ %%", Fmt.n(value, 1))
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 }
