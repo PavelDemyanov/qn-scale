@@ -25,6 +25,10 @@ struct WeightPlot {
         let fat: Double?
         /// Изменение к предыдущему измерению — берётся ГОТОВЫМ из снимка.
         let delta: Double?
+        /// Вершина или впадина кривой: соседи по обе стороны ниже (или оба
+        /// выше). Только такие точки подписываются плашками — на подписи у
+        /// каждой точки график превращается в кашу.
+        let isExtreme: Bool
         let point: CGPoint
     }
 
@@ -333,12 +337,28 @@ struct WeightPlot {
         }
 
         // ---- точки, прогноз, цель
-        p.samples = seg.filter { $0.date >= p.t0 && $0.date <= p.t1 }
+        // Экстремумы ищутся по `seg` — он шире окна на точку с каждой стороны,
+        // поэтому у крайних видимых засечек соседи настоящие, а не обрезанные
+        // краем кадра.
+        p.samples = seg.indices.compactMap { i -> Sample? in
+            let q = seg[i]
+            guard q.date >= p.t0, q.date <= p.t1 else { return nil }
+            let extreme: Bool
+            if showDeltas, i > 0, i < seg.count - 1 {
+                // Произведение разностей с соседями положительно и у вершины,
+                // и у впадины; ноль (сосед с тем же весом) экстремумом не
+                // считается — подписывать плато нечем.
+                extreme = (q.kg - seg[i - 1].kg) * (q.kg - seg[i + 1].kg) > 0
+            } else {
+                extreme = false
+            }
             // Дельта достаётся из словаря ТОЛЬКО когда её собираются рисовать:
             // на кадрах жеста в «Истории» это лишний поиск на каждую засечку.
-            .map { Sample(id: $0.id, date: $0.date, kg: $0.kg, fat: $0.fat,
-                          delta: showDeltas ? s.deltas[$0.id] : nil,
-                          point: CGPoint(x: p.x($0.date), y: p.y($0.kg))) }
+            return Sample(id: q.id, date: q.date, kg: q.kg, fat: q.fat,
+                          delta: showDeltas ? s.deltas[q.id] : nil,
+                          isExtreme: extreme,
+                          point: CGPoint(x: p.x(q.date), y: p.y(q.kg)))
+        }
         if showDots {
             for sm in p.samples {
                 p.dots.addEllipse(in: CGRect(x: sm.point.x - 2.6, y: sm.point.y - 2.6,

@@ -152,21 +152,47 @@ struct WeightChartCanvas: View, Equatable {
                 // Поле от края полотна: без него прижатая плашка упиралась в
                 // самый край экрана, тогда как у всего остального поле 16.
                 let edge: CGFloat = 6
+                // Сами измерения — тоже занятое место. Плашка, севшая на
+                // соседнюю засечку, закрывает ровно то, ради чего на график и
+                // смотрят: где именно прошла кривая.
+                let dots = plot.samples.map {
+                    CGRect(x: $0.point.x - 7, y: $0.point.y - 7, width: 14, height: 14)
+                }
                 var drawn: [CGRect] = []
-                for sm in plot.samples.sorted(by: { abs($0.delta ?? 0) > abs($1.delta ?? 0) }) {
+                // Подписываются ТОЛЬКО вершины и впадины: у каждой засечки —
+                // сплошная лента подписей, по которой не видно самой кривой.
+                for sm in plot.samples.filter(\.isExtreme)
+                    .sorted(by: { abs($0.delta ?? 0) > abs($1.delta ?? 0) }) {
                     // Нулевое изменение не подписываем: «+0,00» — это шум,
                     // а сама засечка на месте и так видна.
                     guard let d = sm.delta, abs(d) >= 0.005 else { continue }
                     let up = d > 0
-                    // Набор — над точкой, сброс — под ней: направление плашки
-                    // повторяет направление веса, как у столбиков недели.
-                    var y = up ? sm.point.y - 11 - h / 2 : sm.point.y + 11 + h / 2
-                    y = Swift.min(Swift.max(y, plot.padding.top + h / 2),
-                                  size.height - plot.padding.bottom - h / 2)
                     let x = Swift.min(Swift.max(sm.point.x, plot.plot.minX + edge + w / 2),
                                       plot.plot.maxX - edge - w / 2)
-                    let rect = CGRect(x: x - w / 2, y: y - h / 2, width: w, height: h)
-                    if drawn.contains(where: { $0.insetBy(dx: -3, dy: -3).intersects(rect) }) { continue }
+
+                    // Набор — над точкой, сброс — под ней: направление плашки
+                    // повторяет направление веса, как у столбиков недели. Если
+                    // со своей стороны места нет, пробуем противоположную и
+                    // только потом отказываемся от подписи.
+                    func box(above: Bool) -> CGRect {
+                        var y = above ? sm.point.y - 11 - h / 2 : sm.point.y + 11 + h / 2
+                        y = Swift.min(Swift.max(y, plot.padding.top + h / 2),
+                                      size.height - plot.padding.bottom - h / 2)
+                        return CGRect(x: x - w / 2, y: y - h / 2, width: w, height: h)
+                    }
+                    func free(_ r: CGRect) -> Bool {
+                        !drawn.contains { $0.insetBy(dx: -3, dy: -3).intersects(r) }
+                            && !dots.contains { $0.intersects(r) }
+                    }
+                    let preferred = box(above: up)
+                    let rect: CGRect
+                    if free(preferred) {
+                        rect = preferred
+                    } else {
+                        let flipped = box(above: !up)
+                        guard free(flipped) else { continue }
+                        rect = flipped
+                    }
                     drawn.append(rect)
                     c.fill(Path(roundedRect: rect, cornerRadius: h / 2),
                            with: .color(up ? palette.red : palette.green))
@@ -175,7 +201,7 @@ struct WeightChartCanvas: View, Equatable {
                     c.draw(c.resolve(Text(L("%@ kg", Fmt.signed(d)))
                                         .font(font)
                                         .foregroundStyle(Color.black)),
-                           at: CGPoint(x: x, y: y), anchor: .center)
+                           at: CGPoint(x: rect.midX, y: rect.midY), anchor: .center)
                 }
             }
 

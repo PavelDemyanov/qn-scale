@@ -444,34 +444,25 @@ private struct LayoutChart: View {
                 // на короткой истории, и переключатель стоял бы вовсе без
                 // выделения. Записываем по-прежнему в `period`, чтобы выбор
                 // вернулся сам, когда история дорастёт.
-                Picker(L("Period"), selection: Binding(get: { effectivePeriod },
-                                                    set: { period = $0 })) {
-                    ForEach(heroPeriods) { p in
-                        Text(p == .d90 ? L("3 months") : p.title).tag(p)
+                // Период и выключатель подписей — ОДНОЙ строкой. Прежде это
+                // были две независимые накладки со своими отступами, и центры
+                // у них не совпадали: кнопка сидела выше переключателя.
+                // Выравнивание в строке считает сам HStack, вручную его
+                // подгонять не приходится.
+                HStack(spacing: 10) {
+                    Picker(L("Period"), selection: Binding(get: { effectivePeriod },
+                                                        set: { period = $0 })) {
+                        ForEach(heroPeriods) { p in
+                            Text(p == .d90 ? L("3 months") : p.title).tag(p)
+                        }
                     }
-                }
-                .pickerStyle(.segmented)
-                // Справа переключатель ужат: рядом, в одной с ним строке,
-                // стоит кнопка подписей.
-                .padding(.leading, 16)
-                .padding(.trailing, 72)
-                .frame(width: proxy.size.width, height: 40, alignment: .bottom)
-                .offset(y: 322 - 48)
+                    .pickerStyle(.segmented)
 
-                // Выключатель плашек — в правом нижнем углу полотна, над
-                // переключателем периода: единственный угол, где кривой не
-                // бывает (она приходит туда только хвостом прогноза).
-                // Кнопка подписей — в правом нижнем углу полотна, в одной
-                // строке с периодом. Выше её ставить некуда: там проходит
-                // хвост прогноза, и кнопка садилась ровно на него.
-                //
-                // Поля — ДО рамки: отступ после неё увеличивает саму рамку и
-                // уносит кнопку за край полотна вместе с ней.
-                pillsToggle
-                    .padding(.trailing, 14)
-                    .padding(.bottom, 14)
-                    .frame(width: proxy.size.width, height: 322,
-                           alignment: .bottomTrailing)
+                    pillsToggle
+                }
+                .padding(.horizontal, 16)
+                .frame(width: proxy.size.width, height: 44, alignment: .bottom)
+                .offset(y: 322 - 52)
             }
         }
         .frame(height: 322)
