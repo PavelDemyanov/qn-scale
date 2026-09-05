@@ -45,7 +45,8 @@ struct HistoryChartCard: View {
                                             size: CGSize(width: proxy.size.width,
                                                          height: proxy.size.height),
                                             padding: padding, niceScale: true,
-                                            showFat: settings.showFatSeries)
+                                            showFat: settings.showFatSeries,
+                                            smooth: settings.smoothCurve)
                 let mark = marker(plot)
                 ZStack(alignment: .topLeading) {
                     WeightChartCanvas(plot: plot, palette: palette,
@@ -149,15 +150,10 @@ struct HistoryChartCard: View {
 
     private var controls: some View {
         @Bindable var s = settings
-        return HStack(spacing: 10) {
-            Toggle(isOn: $s.showFatSeries) {
-                Label(L("Body fat"), systemImage: "percent")
-                    .font(.footnote)
-            }
-            .toggleStyle(.button)
-            .buttonStyle(.bordered)
-            .buttonBorderShape(.capsule)
-            .tint(palette.orange)
+        return HStack(spacing: 8) {
+            chip(L("Body fat"), symbol: "percent", isOn: $s.showFatSeries, tint: palette.orange)
+            chip(L("Smooth"), symbol: "point.topleft.down.to.point.bottomright.curvepath",
+                 isOn: $s.smoothCurve, tint: palette.blue)
 
             Spacer(minLength: 0)
 
@@ -175,6 +171,25 @@ struct HistoryChartCard: View {
         }
         .controlSize(.small)
         .padding(.horizontal, 6)
+    }
+
+    /// Кнопка-тумблер со значком и подписью ОДНОГО цвета и размера. Системный
+    /// `Label` внутри такой кнопки красил значок в цвет акцента приложения, а
+    /// не в цвет тумблера, и рисовал его крупнее слова — «%» выходил синим и
+    /// большим рядом с оранжевым «Жир».
+    private func chip(_ title: String, symbol: String, isOn: Binding<Bool>, tint: Color) -> some View {
+        Toggle(isOn: isOn) {
+            HStack(spacing: 5) {
+                Image(systemName: symbol)
+                Text(title)
+            }
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(isOn.wrappedValue ? tint : palette.fg2)
+        }
+        .toggleStyle(.button)
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.capsule)
+        .tint(tint)
     }
 
     /// Размах берётся из ОСЕВШЕГО окна: на кадрах жеста цифра не пляшет.

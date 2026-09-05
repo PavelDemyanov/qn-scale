@@ -44,6 +44,9 @@ final class AppSettings {
     var showFatSeries: Bool { didSet { d.set(showFatSeries, forKey: "showFatSeries") } }
     /// Плашки с изменением веса на главном графике.
     var showDeltaPills: Bool { didSet { d.set(showDeltaPills, forKey: "showDeltaPills") } }
+    /// Кривая без углов на всех графиках. Сглаживание монотонное: вершины и
+    /// впадины остаются ровно в измерениях, см. MonotoneCurve.
+    var smoothCurve: Bool { didSet { d.set(smoothCurve, forKey: "smoothCurve") } }
     /// Язык интерфейса. Держится ЗДЕСЬ, а не в системных настройках телефона:
     /// переключение внутри приложения меняет язык сразу, без перезапуска.
     var language: AppLanguage {
@@ -78,6 +81,7 @@ final class AppSettings {
         // По умолчанию плашки ВКЛЮЧЕНЫ: ради них график и подписан, а кнопка
         // рядом — чтобы убрать, когда мешают смотреть на саму линию.
         showDeltaPills = d.object(forKey: "showDeltaPills") as? Bool ?? true
+        smoothCurve = d.bool(forKey: "smoothCurve")
         // Первый запуск — берём язык телефона.
         language = AppLanguage(rawValue: d.string(forKey: "language") ?? "") ?? .system
         L10n.current = language

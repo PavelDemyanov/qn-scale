@@ -8,6 +8,7 @@ import SwiftUI
 /// продублированными вручную в двух местах.
 struct WeightChart: View {
     @Environment(\.palette) private var palette
+    @Environment(AppSettings.self) private var settings
 
     let snapshot: WeightSnapshot
     let window: ChartWindow
@@ -30,7 +31,7 @@ struct WeightChart: View {
                                     pullGoal: pullGoal, showGoalLine: showGoalLine,
                                     showForecast: showForecast, showDots: showDots,
                                     size: size, padding: padding, niceScale: showAxis,
-                                    showDeltas: showDeltas)
+                                    showDeltas: showDeltas, smooth: settings.smoothCurve)
         ZStack(alignment: .topLeading) {
             WeightChartCanvas(plot: plot, palette: palette,
                               markerX: nil, markerPoint: nil, markerHeld: false,

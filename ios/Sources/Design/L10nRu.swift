@@ -223,6 +223,7 @@ let russianTranslations: [String: String] = [
     "Measurement saved to History": "Измерение сохранено в истории",
     "Chart window": "Окно графика",
     "no body fat": "жир не измерен",
+    "Smooth": "Плавно",
     "Change labels": "Подписи изменений",
     "Full screen": "Во весь экран",
     "Exit full screen": "Выйти из полноэкранного режима",

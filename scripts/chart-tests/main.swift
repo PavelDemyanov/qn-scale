@@ -291,6 +291,64 @@ do {
     check(one.hi > one.lo, "просьба об одной засечке не схлопывает шкалу")
 }
 
+// MARK: Сглаживание без перелёта
+
+do {
+    // Зубчатые данные — тот самый случай, на котором прежнее сглаживание
+    // заворачивалось петлёй: ±1 кг за сутки при шаге в пиксели.
+    let zig: [CGPoint] = [(0, 50), (20, 10), (40, 48), (60, 12), (80, 52), (100, 9), (120, 30)]
+        .map { CGPoint(x: $0.0, y: $0.1) }
+    let segs = MonotoneCurve.segments(zig)
+    check(segs.count == zig.count - 1, "сегментов на один меньше, чем точек")
+    var overshoot = 0
+    var xBackwards = 0
+    for (i, sg) in segs.enumerated() {
+        let a = zig[i], b = zig[i + 1]
+        let lo = min(a.y, b.y), hi = max(a.y, b.y)
+        var prevX = a.x
+        for k in 0...50 {
+            let pt = MonotoneCurve.point(from: a, sg, t: CGFloat(k) / 50)
+            if pt.y < lo - 1e-6 || pt.y > hi + 1e-6 { overshoot += 1 }
+            if pt.x < prevX - 1e-6 { xBackwards += 1 }
+            prevX = pt.x
+        }
+        check(sg.end == b, "сегмент кончается ровно в измерении")
+    }
+    check(overshoot == 0, "кривая не выходит за пределы соседних измерений", "перелётов \(overshoot)")
+    check(xBackwards == 0, "кривая не заворачивает назад по времени", "шагов назад \(xBackwards)")
+
+    // В вершине касательная горизонтальна: контрольные точки по обе стороны
+    // от пика лежат на его высоте.
+    let peak = zig[4]
+    check(near(Double(segs[3].control2.y), Double(peak.y), 1e-9), "у вершины касательная горизонтальна (слева)")
+    check(near(Double(segs[4].control1.y), Double(peak.y), 1e-9), "у вершины касательная горизонтальна (справа)")
+
+    // Монотонный ряд остаётся монотонным.
+    let ramp = (0..<8).map { CGPoint(x: CGFloat($0) * 10, y: CGFloat($0 * $0)) }
+    var prevY: CGFloat = -1
+    var nonMonotone = 0
+    for (i, sg) in MonotoneCurve.segments(ramp).enumerated() {
+        for k in 0...50 {
+            let y = MonotoneCurve.point(from: ramp[i], sg, t: CGFloat(k) / 50).y
+            if y < prevY - 1e-6 { nonMonotone += 1 }
+            prevY = y
+        }
+    }
+    check(nonMonotone == 0, "растущий ряд не идёт вниз между точками", "нарушений \(nonMonotone)")
+
+    // Плато: две одинаковые высоты подряд — между ними ровно прямая.
+    let flat = [CGPoint(x: 0, y: 5), CGPoint(x: 10, y: 20), CGPoint(x: 20, y: 20), CGPoint(x: 30, y: 3)]
+    let mid = MonotoneCurve.point(from: flat[1], MonotoneCurve.segments(flat)[1], t: 0.5)
+    check(near(Double(mid.y), 20, 1e-9), "плато остаётся плоским", "\(mid.y)")
+
+    // Вырожденные входы не роняют.
+    check(MonotoneCurve.segments([]).isEmpty, "пустой вход — пусто")
+    check(MonotoneCurve.segments([CGPoint(x: 1, y: 1)]).isEmpty, "одна точка — пусто")
+    let two = MonotoneCurve.segments([CGPoint(x: 0, y: 0), CGPoint(x: 10, y: 10)])
+    check(two.count == 1 && near(Double(MonotoneCurve.point(from: .zero, two[0], t: 0.5).y), 5, 1e-9),
+          "две точки — прямая")
+}
+
 print(failures == 0
       ? "✅ ядро графика: \(checks) проверок, все прошли"
       : "\(failures) из \(checks) проверок упали")

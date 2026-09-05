@@ -48,6 +48,7 @@ struct WeightPlot {
         var niceScale = false
         var fat = false
         var deltas = false
+        var smooth = false
     }
 
     var stamp = Stamp()
@@ -168,7 +169,7 @@ struct WeightPlot {
                       pullGoal: Bool, showGoalLine: Bool, showForecast: Bool,
                       showDots: Bool, size: CGSize, padding: Padding,
                       niceScale: Bool = false, showFat: Bool = false,
-                      showDeltas: Bool = false) -> WeightPlot {
+                      showDeltas: Bool = false, smooth: Bool = false) -> WeightPlot {
         var p = WeightPlot()
         p.size = size
         p.padding = padding
@@ -176,7 +177,7 @@ struct WeightPlot {
                         width: size.width, height: size.height, goal: goal,
                         pullGoal: pullGoal, goalLine: showGoalLine,
                         forecast: showForecast, dots: showDots, niceScale: niceScale,
-                        fat: showFat, deltas: showDeltas)
+                        fat: showFat, deltas: showDeltas, smooth: smooth)
         guard size.width > 1, size.height > 1, !s.isEmpty else { return p }
 
         p.t0 = s.timeline.date(at: window.w0)
@@ -256,13 +257,25 @@ struct WeightPlot {
             func flush() {
                 guard run.count > 1 else { return }
                 var line = Path()
-                line.addLines(run)
-                // Заливка участка — замкнутый многоугольник до основания.
-                // Соседние участки делят крайнюю точку, поэтому заливки
-                // смыкаются без щели.
+                // Заливка участка — замкнутая фигура до основания. Соседние
+                // участки делят крайнюю точку, поэтому заливки смыкаются без
+                // щели.
                 var area = Path()
                 area.move(to: CGPoint(x: run[0].x, y: base))
-                for pt in run { area.addLine(to: pt) }
+                area.addLine(to: run[0])
+                if smooth {
+                    // Сглаживание, которое не выходит за пределы измерений —
+                    // см. MonotoneCurve. Линия и заливка идут по ОДНИМ
+                    // сегментам, иначе заливка выглядывала бы из-под кривой.
+                    line.move(to: run[0])
+                    for sg in MonotoneCurve.segments(run) {
+                        line.addCurve(to: sg.end, control1: sg.control1, control2: sg.control2)
+                        area.addCurve(to: sg.end, control1: sg.control1, control2: sg.control2)
+                    }
+                } else {
+                    line.addLines(run)
+                    for pt in run.dropFirst() { area.addLine(to: pt) }
+                }
                 area.addLine(to: CGPoint(x: run[run.count - 1].x, y: base))
                 area.closeSubpath()
                 if runIsGap {
@@ -321,7 +334,14 @@ struct WeightPlot {
                 func flushFat() {
                     guard run.count > 1 else { return }
                     var line = Path()
-                    line.addLines(run)
+                    if smooth {
+                        line.move(to: run[0])
+                        for sg in MonotoneCurve.segments(run) {
+                            line.addCurve(to: sg.end, control1: sg.control1, control2: sg.control2)
+                        }
+                    } else {
+                        line.addLines(run)
+                    }
                     p.fatLine.addPath(line)
                 }
                 for q in seg {

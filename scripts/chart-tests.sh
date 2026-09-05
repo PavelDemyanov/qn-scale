@@ -10,7 +10,7 @@ mkdir -p "$OUT"
 # это чистая Foundation, тянуть SwiftUI ради неё не приходится.
 swiftc -O \
   "$SRC/ChartWindow.swift" "$SRC/BrushLayout.swift" \
-  "$SRC/WeightTimeline.swift" "$SRC/WeightAxis.swift" \
+  "$SRC/WeightTimeline.swift" "$SRC/WeightAxis.swift" "$SRC/MonotoneCurve.swift" \
   "$ROOT/ios/Sources/Design/L10n.swift" "$ROOT/ios/Sources/Design/L10nRu.swift" \
   "$ROOT/scripts/chart-tests/main.swift" -o "$OUT/run"
 "$OUT/run"
